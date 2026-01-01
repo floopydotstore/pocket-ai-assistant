@@ -8,14 +8,16 @@ import {
   Trash2,
   ExternalLink,
   ChevronRight,
-  Moon,
   Mail,
   Info,
+  LogOut,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useAgentStore } from '@/store/agentStore';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -32,6 +34,7 @@ import {
 export default function Settings() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, signOut, deleteAccount } = useAuth();
   const cloudSyncEnabled = useAgentStore((s) => s.cloudSyncEnabled);
   const setCloudSync = useAgentStore((s) => s.setCloudSync);
   const exportData = useAgentStore((s) => s.exportData);
@@ -53,8 +56,20 @@ export default function Settings() {
 
   const handleClearData = () => {
     clearAllData();
-    toast({ description: 'All data cleared' });
-    navigate('/');
+    toast({ description: 'All local data cleared' });
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
+  const handleDeleteAccount = async () => {
+    const { error } = await deleteAccount();
+    if (!error) {
+      clearAllData();
+      navigate('/onboarding');
+    }
   };
 
   return (
@@ -74,6 +89,39 @@ export default function Settings() {
 
       {/* Content */}
       <main className="px-5 pb-24 space-y-6">
+        {/* Account */}
+        <section>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Account
+          </h2>
+          <Card variant="default">
+            <CardContent className="p-0 divide-y divide-border">
+              {user ? (
+                <>
+                  <SettingRow
+                    icon={User}
+                    title={user.email || 'User'}
+                    description="Signed in"
+                  />
+                  <SettingRow
+                    icon={LogOut}
+                    title="Sign out"
+                    description="Sign out of your account"
+                    onClick={handleSignOut}
+                  />
+                </>
+              ) : (
+                <SettingRow
+                  icon={User}
+                  title="Sign in"
+                  description="Sign in to sync agents across devices"
+                  onClick={() => navigate('/auth')}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
         {/* Cloud & Sync */}
         <section>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
@@ -89,14 +137,20 @@ export default function Settings() {
                   <Switch
                     checked={cloudSyncEnabled}
                     onCheckedChange={setCloudSync}
+                    disabled={!user}
                   />
                 }
               />
             </CardContent>
           </Card>
-          {cloudSyncEnabled && (
+          {!user && (
             <p className="text-xs text-muted-foreground mt-2 px-1">
-              Your data will be securely synced to the cloud. You can disable this at any time.
+              Sign in to enable cloud sync.
+            </p>
+          )}
+          {cloudSyncEnabled && user && (
+            <p className="text-xs text-muted-foreground mt-2 px-1">
+              Your data will be securely synced to the cloud.
             </p>
           )}
         </section>
@@ -119,23 +173,23 @@ export default function Settings() {
                   <div>
                     <SettingRow
                       icon={Trash2}
-                      title="Clear all data"
-                      description="Delete all agents and history"
+                      title="Clear local data"
+                      description="Delete all locally stored data"
                       destructive
                     />
                   </div>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete all data?</AlertDialogTitle>
+                    <AlertDialogTitle>Clear local data?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will permanently delete all your agents, conversations, and history. This action cannot be undone.
+                      This will delete all locally stored agents and history. Cloud data will remain intact if synced.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleClearData} className="bg-destructive text-destructive-foreground">
-                      Delete all
+                      Clear data
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -193,41 +247,43 @@ export default function Settings() {
         </section>
 
         {/* Delete Account - Important for Play Store compliance */}
-        <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Account
-          </h2>
-          <Card variant="default" className="border-destructive/20">
-            <CardContent className="p-0">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <div>
-                    <SettingRow
-                      icon={Trash2}
-                      title="Delete account"
-                      description="Permanently delete your account and all data"
-                      destructive
-                    />
-                  </div>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete your account and all associated data including agents, conversations, and history. This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearData} className="bg-destructive text-destructive-foreground">
-                      Delete account
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CardContent>
-          </Card>
-        </section>
+        {user && (
+          <section>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Danger Zone
+            </h2>
+            <Card variant="default" className="border-destructive/20">
+              <CardContent className="p-0">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <div>
+                      <SettingRow
+                        icon={Trash2}
+                        title="Delete account"
+                        description="Permanently delete your account and all data"
+                        destructive
+                      />
+                    </div>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete your account and all associated data including agents, conversations, and history. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground">
+                        Delete account
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </CardContent>
+            </Card>
+          </section>
+        )}
       </main>
     </div>
   );
