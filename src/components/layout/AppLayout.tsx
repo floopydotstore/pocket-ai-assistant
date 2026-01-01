@@ -6,7 +6,7 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
-const noNavRoutes = ['/', '/onboarding'];
+const noNavRoutes = ['/', '/onboarding', '/create', '/auth'];
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
