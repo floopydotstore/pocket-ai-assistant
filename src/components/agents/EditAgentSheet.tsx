@@ -11,7 +11,7 @@ import {
   SheetDescription,
   SheetFooter,
 } from '@/components/ui/sheet';
-import { useAgentStore } from '@/store/agentStore';
+import { useAgentSync } from '@/hooks/useAgentSync';
 import { TEMPLATES, type Agent } from '@/types/agent';
 import { toast } from 'sonner';
 
@@ -22,7 +22,7 @@ interface EditAgentSheetProps {
 }
 
 export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProps) {
-  const updateAgent = useAgentStore((s) => s.updateAgent);
+  const { updateAgent } = useAgentSync();
   
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -40,7 +40,7 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
 
   const template = agent ? TEMPLATES.find((t) => t.id === agent.template) : null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!agent) return;
     
     if (name.trim().length < 2) {
@@ -48,7 +48,7 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
       return;
     }
 
-    updateAgent(agent.id, {
+    await updateAgent(agent.id, {
       name: name.trim(),
       prompt,
       temperature: temperature[0],

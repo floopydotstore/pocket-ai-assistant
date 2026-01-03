@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Play, Clock, Bot, Pencil, Trash2, MoreVertical } from 'lucide-react';
+import { Plus, Search, Play, Clock, Bot, Pencil, Trash2, MoreVertical, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAgentStore } from '@/store/agentStore';
+import { useAgentSync } from '@/hooks/useAgentSync';
 import { TEMPLATES, type Agent } from '@/types/agent';
 import { EditAgentSheet } from '@/components/agents/EditAgentSheet';
 import { DeleteAgentDialog } from '@/components/agents/DeleteAgentDialog';
@@ -19,9 +20,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [editAgent, setEditAgent] = useState<Agent | null>(null);
-  const [deleteAgent, setDeleteAgent] = useState<Agent | null>(null);
+  const [deleteAgentState, setDeleteAgentState] = useState<Agent | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const agents = useAgentStore((s) => s.agents);
-  const updateAgent = useAgentStore((s) => s.updateAgent);
+  const { updateAgent, loadFromCloud, shouldSync } = useAgentSync();
+
+  // Load agents from cloud on mount if sync is enabled
+  useEffect(() => {
+    if (shouldSync) {
+      setIsLoading(true);
+      loadFromCloud().finally(() => setIsLoading(false));
+    }
+  }, [shouldSync, loadFromCloud]);
 
   const filteredAgents = agents.filter(
     (agent) =>
@@ -33,8 +43,8 @@ export default function Dashboard() {
     return TEMPLATES.find((t) => t.id === templateId);
   };
 
-  const handleQuickRun = (agentId: string) => {
-    updateAgent(agentId, { lastRunAt: new Date().toISOString() });
+  const handleQuickRun = async (agentId: string) => {
+    await updateAgent(agentId, { lastRunAt: new Date().toISOString() });
     navigate(`/chat/${agentId}`);
   };
 
@@ -149,7 +159,7 @@ export default function Dashboard() {
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setDeleteAgent(agent);
+                                setDeleteAgentState(agent);
                               }}
                               className="text-destructive focus:text-destructive"
                             >
@@ -184,9 +194,9 @@ export default function Dashboard() {
       />
       
       <DeleteAgentDialog
-        agent={deleteAgent}
-        open={!!deleteAgent}
-        onOpenChange={(open) => !open && setDeleteAgent(null)}
+        agent={deleteAgentState}
+        open={!!deleteAgentState}
+        onOpenChange={(open) => !open && setDeleteAgentState(null)}
       />
     </div>
   );
