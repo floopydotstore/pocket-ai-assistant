@@ -39,6 +39,38 @@ export function useAgentSync() {
       createdAt: row.created_at,
       lastRunAt: undefined,
       runCount: 0,
+      isPublic: row.is_public ?? false,
+      userId: row.user_id,
+    }));
+  }, [user]);
+
+  // Fetch public agents from all users
+  const fetchPublicAgents = useCallback(async (): Promise<Agent[]> => {
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching public agents:', error);
+      return [];
+    }
+
+    return (data || []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      template: row.template as AgentTemplate,
+      prompt: row.prompt,
+      temperature: row.temperature ?? 0.7,
+      maxTokens: row.max_tokens ?? 500,
+      createdAt: row.created_at,
+      lastRunAt: undefined,
+      runCount: 0,
+      isPublic: row.is_public ?? false,
+      userId: row.user_id,
     }));
   }, [user]);
 
@@ -60,6 +92,7 @@ export function useAgentSync() {
         prompt: agent.prompt,
         temperature: agent.temperature,
         max_tokens: agent.maxTokens,
+        is_public: agent.isPublic,
         description: null,
         color: 'primary',
         icon: 'bot',
@@ -92,6 +125,7 @@ export function useAgentSync() {
       if (updates.prompt !== undefined) cloudUpdates.prompt = updates.prompt;
       if (updates.temperature !== undefined) cloudUpdates.temperature = updates.temperature;
       if (updates.maxTokens !== undefined) cloudUpdates.max_tokens = updates.maxTokens;
+      if (updates.isPublic !== undefined) cloudUpdates.is_public = updates.isPublic;
 
       if (Object.keys(cloudUpdates).length === 0) return;
 
@@ -146,6 +180,7 @@ export function useAgentSync() {
       prompt: agent.prompt,
       temperature: agent.temperature,
       max_tokens: agent.maxTokens,
+      is_public: agent.isPublic ?? false,
       description: null,
       color: 'primary',
       icon: 'bot',
@@ -182,6 +217,7 @@ export function useAgentSync() {
   return {
     shouldSync,
     fetchAgents,
+    fetchPublicAgents,
     createAgent,
     updateAgent,
     deleteAgent,

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { Globe, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import {
   Sheet,
   SheetContent,
@@ -28,6 +30,7 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
   const [prompt, setPrompt] = useState('');
   const [temperature, setTemperature] = useState([0.7]);
   const [maxTokens, setMaxTokens] = useState([500]);
+  const [isPublic, setIsPublic] = useState(false);
 
   useEffect(() => {
     if (agent) {
@@ -35,6 +38,7 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
       setPrompt(agent.prompt);
       setTemperature([agent.temperature]);
       setMaxTokens([agent.maxTokens]);
+      setIsPublic(agent.isPublic ?? false);
     }
   }, [agent]);
 
@@ -53,6 +57,7 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
       prompt,
       temperature: temperature[0],
       maxTokens: maxTokens[0],
+      isPublic,
     });
     
     toast.success('Agent updated');
@@ -138,6 +143,26 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
             <p className="text-xs text-muted-foreground">
               Approximate maximum length of the response
             </p>
+          </div>
+
+          {/* Visibility */}
+          <div className="p-4 rounded-xl bg-secondary/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {isPublic ? (
+                  <Globe className="w-5 h-5 text-primary" />
+                ) : (
+                  <Lock className="w-5 h-5 text-muted-foreground" />
+                )}
+                <div>
+                  <Label className="text-base">Make agent public</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {isPublic ? 'Anyone can see and use this agent' : 'Only you can access this agent'}
+                  </p>
+                </div>
+              </div>
+              <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+            </div>
           </div>
         </div>
 

@@ -21,6 +21,7 @@ export type Database = {
           description: string | null
           icon: string | null
           id: string
+          is_public: boolean
           max_tokens: number | null
           name: string
           prompt: string
@@ -35,6 +36,7 @@ export type Database = {
           description?: string | null
           icon?: string | null
           id?: string
+          is_public?: boolean
           max_tokens?: number | null
           name: string
           prompt: string
@@ -49,6 +51,7 @@ export type Database = {
           description?: string | null
           icon?: string | null
           id?: string
+          is_public?: boolean
           max_tokens?: number | null
           name?: string
           prompt?: string
