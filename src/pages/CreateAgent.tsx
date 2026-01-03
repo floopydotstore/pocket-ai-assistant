@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Check, Sparkles, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Sparkles, AlertCircle, Globe, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { useAgentSync } from '@/hooks/useAgentSync';
 import { TEMPLATES, type AgentTemplate, type Agent } from '@/types/agent';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ export default function CreateAgent() {
   const [customPrompt, setCustomPrompt] = useState('');
   const [temperature, setTemperature] = useState([0.7]);
   const [maxTokens, setMaxTokens] = useState([500]);
+  const [isPublic, setIsPublic] = useState(false);
 
   const stepIndex = STEPS.indexOf(currentStep);
   const template = TEMPLATES.find((t) => t.id === selectedTemplate);
@@ -74,6 +76,7 @@ export default function CreateAgent() {
       maxTokens: maxTokens[0],
       createdAt: new Date().toISOString(),
       runCount: 0,
+      isPublic,
     };
 
     await createAgent(newAgent);
@@ -130,8 +133,10 @@ export default function CreateAgent() {
           <SettingsStep
             temperature={temperature}
             maxTokens={maxTokens}
+            isPublic={isPublic}
             onTemperatureChange={setTemperature}
             onMaxTokensChange={setMaxTokens}
+            onPublicChange={setIsPublic}
           />
         )}
 
@@ -142,6 +147,7 @@ export default function CreateAgent() {
             prompt={customPrompt}
             temperature={temperature[0]}
             maxTokens={maxTokens[0]}
+            isPublic={isPublic}
           />
         )}
       </main>
@@ -276,13 +282,17 @@ function NameStep({
 function SettingsStep({
   temperature,
   maxTokens,
+  isPublic,
   onTemperatureChange,
   onMaxTokensChange,
+  onPublicChange,
 }: {
   temperature: number[];
   maxTokens: number[];
+  isPublic: boolean;
   onTemperatureChange: (v: number[]) => void;
   onMaxTokensChange: (v: number[]) => void;
+  onPublicChange: (v: boolean) => void;
 }) {
   return (
     <div className="space-y-8 animate-fade-in">
@@ -329,6 +339,26 @@ function SettingsStep({
             Approximate maximum length of the response
           </p>
         </div>
+
+        {/* Visibility */}
+        <div className="p-4 rounded-xl bg-secondary/50 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {isPublic ? (
+                <Globe className="w-5 h-5 text-primary" />
+              ) : (
+                <Lock className="w-5 h-5 text-muted-foreground" />
+              )}
+              <div>
+                <Label className="text-base">Make agent public</Label>
+                <p className="text-xs text-muted-foreground">
+                  {isPublic ? 'Anyone can see and use this agent' : 'Only you can access this agent'}
+                </p>
+              </div>
+            </div>
+            <Switch checked={isPublic} onCheckedChange={onPublicChange} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -340,12 +370,14 @@ function ConfirmStep({
   prompt,
   temperature,
   maxTokens,
+  isPublic,
 }: {
   name: string;
   template?: typeof TEMPLATES[0];
   prompt: string;
   temperature: number;
   maxTokens: number;
+  isPublic: boolean;
 }) {
   return (
     <div className="space-y-6 animate-fade-in">
@@ -371,12 +403,25 @@ function ConfirmStep({
             <p className="text-xs text-muted-foreground mb-1">System prompt</p>
             <p className="text-sm line-clamp-3">{prompt}</p>
           </div>
-          <div className="flex gap-4 text-sm">
+          <div className="flex gap-4 text-sm flex-wrap">
             <span className="text-muted-foreground">
               Creativity: <span className="text-foreground font-medium">{temperature.toFixed(1)}</span>
             </span>
             <span className="text-muted-foreground">
               Max tokens: <span className="text-foreground font-medium">{maxTokens}</span>
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground">
+              {isPublic ? (
+                <>
+                  <Globe className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-primary font-medium">Public</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5" />
+                  <span className="text-foreground font-medium">Private</span>
+                </>
+              )}
             </span>
           </div>
         </CardContent>

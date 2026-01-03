@@ -15,6 +15,8 @@ export interface Agent {
   createdAt: string;
   lastRunAt?: string;
   runCount: number;
+  isPublic: boolean;
+  userId?: string;
 }
 
 export interface Message {
