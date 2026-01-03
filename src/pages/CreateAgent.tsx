@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { useAgentStore } from '@/store/agentStore';
+import { useAgentSync } from '@/hooks/useAgentSync';
 import { TEMPLATES, type AgentTemplate, type Agent } from '@/types/agent';
 import { cn } from '@/lib/utils';
 
@@ -16,7 +16,7 @@ const STEPS: WizardStep[] = ['template', 'name', 'settings', 'confirm'];
 
 export default function CreateAgent() {
   const navigate = useNavigate();
-  const addAgent = useAgentStore((s) => s.addAgent);
+  const { createAgent } = useAgentSync();
   
   const [currentStep, setCurrentStep] = useState<WizardStep>('template');
   const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null);
@@ -62,7 +62,7 @@ export default function CreateAgent() {
     setCurrentStep(STEPS[stepIndex - 1]);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!selectedTemplate || !template) return;
 
     const newAgent: Agent = {
@@ -76,7 +76,7 @@ export default function CreateAgent() {
       runCount: 0,
     };
 
-    addAgent(newAgent);
+    await createAgent(newAgent);
     navigate(`/chat/${newAgent.id}`);
   };
 
