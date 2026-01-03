@@ -1,15 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Play, Clock, Bot } from 'lucide-react';
+import { Plus, Search, Play, Clock, Bot, Pencil, Trash2, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAgentStore } from '@/store/agentStore';
-import { TEMPLATES } from '@/types/agent';
+import { TEMPLATES, type Agent } from '@/types/agent';
+import { EditAgentSheet } from '@/components/agents/EditAgentSheet';
+import { DeleteAgentDialog } from '@/components/agents/DeleteAgentDialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [editAgent, setEditAgent] = useState<Agent | null>(null);
+  const [deleteAgent, setDeleteAgent] = useState<Agent | null>(null);
   const agents = useAgentStore((s) => s.agents);
   const updateAgent = useAgentStore((s) => s.updateAgent);
 
@@ -102,18 +112,53 @@ export default function Dashboard() {
                           </CardDescription>
                         </div>
                       </div>
-                      <Button
-                        variant="soft"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQuickRun(agent.id);
-                        }}
-                        className="h-8 gap-1.5"
-                      >
-                        <Play className="w-3.5 h-3.5" />
-                        Run
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="soft"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickRun(agent.id);
+                          }}
+                          className="h-8 gap-1.5"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          Run
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditAgent(agent);
+                              }}
+                            >
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteAgent(agent);
+                              }}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -131,6 +176,18 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      <EditAgentSheet
+        agent={editAgent}
+        open={!!editAgent}
+        onOpenChange={(open) => !open && setEditAgent(null)}
+      />
+      
+      <DeleteAgentDialog
+        agent={deleteAgent}
+        open={!!deleteAgent}
+        onOpenChange={(open) => !open && setDeleteAgent(null)}
+      />
     </div>
   );
 }
