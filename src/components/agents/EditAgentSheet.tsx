@@ -1,3 +1,4 @@
+// src/components/agents/EditAgentSheet.tsx
 import { useState, useEffect } from 'react';
 import { Globe, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,46 +26,71 @@ interface EditAgentSheetProps {
 
 export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProps) {
   const { updateAgent } = useAgentSync();
-  
+
+  // default sensible values
+  const DEFAULT_TEMPERATURE = 0.7;
+  const DEFAULT_MAX_TOKENS = 500;
+
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
-  const [temperature, setTemperature] = useState([0.7]);
-  const [maxTokens, setMaxTokens] = useState([500]);
+  const [temperature, setTemperature] = useState<number[]>([DEFAULT_TEMPERATURE]);
+  const [maxTokens, setMaxTokens] = useState<number[]>([DEFAULT_MAX_TOKENS]);
   const [isPublic, setIsPublic] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (agent) {
-      setName(agent.name);
-      setPrompt(agent.prompt);
-      setTemperature([agent.temperature]);
-      setMaxTokens([agent.maxTokens]);
-      setIsPublic(agent.isPublic ?? false);
+      setName(agent.name ?? '');
+      setPrompt(agent.prompt ?? '');
+      // defensive fallbacks if DB values are null/undefined
+      setTemperature([typeof agent.temperature === 'number' ? agent.temperature : DEFAULT_TEMPERATURE]);
+      setMaxTokens([typeof agent.maxTokens === 'number' ? agent.maxTokens : DEFAULT_MAX_TOKENS]);
+      setIsPublic(Boolean(agent.isPublic));
+    } else {
+      // reset when no agent
+      setName('');
+      setPrompt('');
+      setTemperature([DEFAULT_TEMPERATURE]);
+      setMaxTokens([DEFAULT_MAX_TOKENS]);
+      setIsPublic(false);
     }
   }, [agent]);
 
-  const template = agent ? TEMPLATES.find((t) => t.id === agent.template) : null;
+  const template = agent ? TEMPLATES.find((t) => t.id === agent.template) ?? null : null;
 
   const handleSave = async () => {
     if (!agent) return;
-    
+
     if (name.trim().length < 2) {
       toast.error('Name must be at least 2 characters');
       return;
     }
 
-    await updateAgent(agent.id, {
-      name: name.trim(),
-      prompt,
-      temperature: temperature[0],
-      maxTokens: maxTokens[0],
-      isPublic,
-    });
-    
-    toast.success('Agent updated');
-    onOpenChange(false);
+    setSaving(true);
+    try {
+      await updateAgent(agent.id, {
+        name: name.trim(),
+        prompt: prompt ?? '',
+        temperature: (temperature?.[0] ?? DEFAULT_TEMPERATURE),
+        maxTokens: (maxTokens?.[0] ?? DEFAULT_MAX_TOKENS),
+        isPublic,
+      });
+
+      toast.success('Agent updated');
+      onOpenChange(false);
+    } catch (err) {
+      console.error('Failed to update agent', err);
+      toast.error('Failed to save agent. See console for details.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!agent) return null;
+
+  // safe values for display
+  const displayTemp = (typeof temperature?.[0] === 'number' ? temperature[0] : DEFAULT_TEMPERATURE);
+  const displayMaxTokens = (typeof maxTokens?.[0] === 'number' ? maxTokens[0] : DEFAULT_MAX_TOKENS);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -111,11 +137,11 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Creativity</Label>
-              <span className="text-sm font-medium text-primary">{temperature[0].toFixed(1)}</span>
+              <span className="text-sm font-medium text-primary">{displayTemp.toFixed(1)}</span>
             </div>
             <Slider
               value={temperature}
-              onValueChange={setTemperature}
+              onValueChange={(v: number[]) => setTemperature(v)}
               max={1}
               min={0}
               step={0.1}
@@ -130,11 +156,11 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Response length</Label>
-              <span className="text-sm font-medium text-primary">{maxTokens[0]} tokens</span>
+              <span className="text-sm font-medium text-primary">{displayMaxTokens} tokens</span>
             </div>
             <Slider
               value={maxTokens}
-              onValueChange={setMaxTokens}
+              onValueChange={(v: number[]) => setMaxTokens(v)}
               max={2000}
               min={100}
               step={100}
@@ -161,17 +187,17 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
                   </p>
                 </div>
               </div>
-              <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+              <Switch checked={isPublic} onCheckedChange={(v) => setIsPublic(Boolean(v))} />
             </div>
           </div>
         </div>
 
         <SheetFooter className="flex-row gap-3 pt-4 border-t border-border">
-          <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button variant="hero" className="flex-1" onClick={handleSave}>
-            Save Changes
+          <Button variant="hero" className="flex-1" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
           </Button>
         </SheetFooter>
       </SheetContent>

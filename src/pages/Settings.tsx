@@ -238,8 +238,8 @@ export default function Settings() {
               <SettingRow
                 icon={Mail}
                 title="Contact support"
-                description="support@pocketagent.app"
-                onClick={() => window.open('mailto:support@pocketagent.app', '_blank')}
+                description="info@floopy.store"
+                onClick={() => window.open('mailto:support@floopy.store', '_blank')}
                 external
               />
             </CardContent>

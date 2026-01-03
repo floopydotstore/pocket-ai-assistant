@@ -67,8 +67,17 @@ export default function CreateAgent() {
   const handleCreate = async () => {
     if (!selectedTemplate || !template) return;
 
+    // Generate UUID compatible with all environments
+    const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+
     const newAgent: Agent = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       name: agentName.trim(),
       template: selectedTemplate,
       prompt: customPrompt || template.samplePrompt,

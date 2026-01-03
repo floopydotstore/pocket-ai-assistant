@@ -1,6 +1,19 @@
-import { useState, useEffect } from 'react';
+// src/pages/Dashboard.tsx
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Play, Clock, Bot, Pencil, Trash2, MoreVertical, Globe, Lock, Users } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Play,
+  Clock,
+  Bot,
+  Pencil,
+  Trash2,
+  MoreVertical,
+  Globe,
+  Lock,
+  Users,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,12 +25,33 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAgentStore } from '@/store/agentStore';
-import { useAgentSync } from '@/hooks/useAgentSync';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { TEMPLATES, type Agent } from '@/types/agent';
 import { EditAgentSheet } from '@/components/agents/EditAgentSheet';
 import { DeleteAgentDialog } from '@/components/agents/DeleteAgentDialog';
+
+// Agent type used by the component (maps DB fields to camelCase)
+export type Agent = {
+  id: string;
+  name: string;
+  template: string;
+  userId: string;
+  isPublic: boolean;
+  lastRunAt?: string | null;
+  runCount?: number | null;
+  createdAt?: string | null;
+};
+
+const mapRowToAgent = (row: any): Agent => ({
+  id: row.id,
+  name: row.name,
+  template: row.template,
+  userId: row.user_id ?? row.userId ?? row.user,
+  isPublic: !!(row.is_public ?? row.isPublic),
+  lastRunAt: row.last_run_at ?? row.lastRunAt ?? null,
+  runCount: row.run_count ?? row.runCount ?? 0,
+  createdAt: row.created_at ?? row.createdAt ?? null,
+});
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -26,45 +60,119 @@ export default function Dashboard() {
   const [editAgent, setEditAgent] = useState<Agent | null>(null);
   const [deleteAgentState, setDeleteAgentState] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [userAgents, setUserAgents] = useState<Agent[]>([]);
   const [publicAgents, setPublicAgents] = useState<Agent[]>([]);
-  const agents = useAgentStore((s) => s.agents);
-  const { updateAgent, loadFromCloud, fetchPublicAgents, shouldSync } = useAgentSync();
+  const [activeTab, setActiveTab] = useState<'my-agents' | 'public-agents'>(() =>
+    user ? 'my-agents' : 'public-agents'
+  );
 
-  // Load agents from cloud on mount if sync is enabled
+  // keep tab synced to auth state (if user logs out -> show public)
   useEffect(() => {
-    if (shouldSync) {
-      setIsLoading(true);
-      Promise.all([loadFromCloud(), fetchPublicAgents().then(setPublicAgents)])
-        .finally(() => setIsLoading(false));
-    }
-  }, [shouldSync, loadFromCloud, fetchPublicAgents]);
+    setActiveTab(user ? 'my-agents' : 'public-agents');
+  }, [user]);
 
-  const filteredAgents = agents.filter(
-    (agent) =>
-      agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agent.template.toLowerCase().includes(searchQuery.toLowerCase())
+  // fetch user's agents
+  const fetchUserAgents = useCallback(async () => {
+    if (!user) {
+      setUserAgents([]);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUserAgents((data ?? []).map(mapRowToAgent));
+    } catch (err) {
+      console.error('Error fetching user agents', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // fetch public agents
+  const fetchPublicAgents = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
+        .limit(200); // limit to avoid huge payloads
+      if (error) throw error;
+      setPublicAgents((data ?? []).map(mapRowToAgent));
+    } catch (err) {
+      console.error('Error fetching public agents', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // initial and on-user-change load
+  useEffect(() => {
+    // Always fetch public agents
+    fetchPublicAgents();
+    console.log('====================================');
+    console.log(filteredPublicAgents.length);
+    console.log('====================================');
+
+    // fetch user agents only if logged in
+    if (user) {
+      fetchUserAgents();
+    } else {
+      setUserAgents([]);
+    }
+    // we intentionally do not add fetchUserAgents/fetchPublicAgents to deps (callbacks are stable)
+  }, [user, fetchPublicAgents, fetchUserAgents]);
+
+  // listen to realtime changes on agents table to keep lists fresh (optional)
+  useEffect(() => {
+    const subscription = supabase
+      .channel('public:agents')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agents' },
+        () => {
+          fetchPublicAgents();
+          if (user) fetchUserAgents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [user, fetchPublicAgents, fetchUserAgents]);
+
+  const filteredUserAgents = userAgents.filter(
+    (a) =>
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.template.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredPublicAgents = publicAgents
-    .filter((agent) => agent.userId !== user?.id) // Exclude user's own agents from public list
-    .filter(
-      (agent) =>
-        agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        agent.template.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+  // if user is logged in, exclude their own public agents; if not logged in, keep all public agents
+  .filter((a) => (user ? a.userId !== user.id : true))  // ← Changed false to true
+  .filter(
+    (a) =>
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.template.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const getTemplateInfo = (templateId: string) => {
-    return TEMPLATES.find((t) => t.id === templateId);
-  };
+  // Template helper — you likely have this constant elsewhere
+  const TEMPLATES = [
+    { id: 'default', name: 'Default', icon: '🤖' },
+    // Add your templates...
+  ];
+  const getTemplateInfo = (templateId: string) =>
+    TEMPLATES.find((t) => t.id === templateId) ?? { id: templateId, name: templateId, icon: '🤖' };
 
-  const handleQuickRun = async (agentId: string, isOwner: boolean) => {
-    if (isOwner) {
-      await updateAgent(agentId, { lastRunAt: new Date().toISOString() });
-    }
-    navigate(`/chat/${agentId}`);
-  };
-
-  const formatLastRun = (dateString?: string) => {
+  const formatLastRun = (dateString?: string | null) => {
     if (!dateString) return 'Never run';
     const date = new Date(dateString);
     const now = new Date();
@@ -72,11 +180,48 @@ export default function Dashboard() {
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-
     if (minutes < 1) return 'Just now';
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     return `${days}d ago`;
+  };
+
+  // update agent (used when running to update lastRunAt/runCount)
+  const updateAgentRun = async (agentId: string) => {
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('agents')
+        .update({ last_run_at: now })
+        .eq('id', agentId)
+        .select();
+      if (error) throw error;
+      fetchPublicAgents();
+      if (user) fetchUserAgents();
+      return data?.[0] ? mapRowToAgent(data[0]) : null;
+    } catch (err) {
+      console.error('Error updating agent run', err);
+      return null;
+    }
+  };
+
+  const handleQuickRun = async (agentId: string, isOwner: boolean) => {
+    if (isOwner) {
+      await updateAgentRun(agentId);
+    }
+    navigate(`/chat/${agentId}`);
+  };
+
+  const onAgentEdited = async () => {
+    await fetchPublicAgents();
+    if (user) await fetchUserAgents();
+    setEditAgent(null);
+  };
+
+  const onAgentDeleted = async () => {
+    await fetchPublicAgents();
+    if (user) await fetchUserAgents();
+    setDeleteAgentState(null);
   };
 
   const renderAgentCard = (agent: Agent, index: number, isOwner: boolean) => {
@@ -105,9 +250,7 @@ export default function Dashboard() {
                     </Badge>
                   )}
                 </div>
-                <CardDescription className="text-xs">
-                  {template?.name || agent.template}
-                </CardDescription>
+                <CardDescription className="text-xs">{template?.name || agent.template}</CardDescription>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -169,7 +312,7 @@ export default function Dashboard() {
                   <Clock className="w-3.5 h-3.5" />
                   {formatLastRun(agent.lastRunAt)}
                 </span>
-                <span>{agent.runCount} runs</span>
+                <span>{agent.runCount ?? 0} runs</span>
               </>
             )}
             {!isOwner && (
@@ -184,18 +327,41 @@ export default function Dashboard() {
     );
   };
 
+  // Skeleton card to show while loading
+  const renderSkeletonCard = (key: string | number) => (
+    <div
+      key={key}
+      role="status"
+      aria-busy="true"
+      className="animate-slide-up"
+      style={{ animationDelay: `${Number(key) * 30}ms` }}
+    >
+      <div className="flex items-start justify-between p-4 rounded-lg border border-border bg-card animate-pulse">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-gray-300 dark:bg-gray-700" />
+          <div className="space-y-2">
+            <div className="w-40 h-4 rounded bg-gray-300 dark:bg-gray-700" />
+            <div className="w-28 h-3 rounded bg-gray-200 dark:bg-gray-600 mt-2" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-16 h-8 rounded bg-gray-300 dark:bg-gray-700" />
+          <div className="w-8 h-8 rounded bg-gray-300 dark:bg-gray-700" />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background safe-area-top">
       {/* Header */}
       <header className="px-5 pt-6 pb-4">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">PocketAgent</h1>
+            <h1 className="text-2xl font-bold text-foreground">Pocket Agent</h1>
             <p className="text-muted-foreground text-sm">Your AI assistants</p>
           </div>
-          <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-            <Bot className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img src="/app-icon.png" alt="app-icon" className="h-10 w-10" />
         </div>
 
         {/* Search */}
@@ -212,20 +378,21 @@ export default function Dashboard() {
 
       {/* Content */}
       <main className="px-5 pb-24">
-        {agents.length === 0 && publicAgents.length === 0 ? (
-          <EmptyState onCreateClick={() => navigate('/create')} />
-        ) : (
-          <Tabs defaultValue="my-agents" className="w-full">
+        
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+            {/* Show "My Agents" tab only when logged in */}
             <TabsList className="w-full mb-4">
-              <TabsTrigger value="my-agents" className="flex-1 gap-2">
-                <Lock className="w-4 h-4" />
-                My Agents
-                {agents.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                    {agents.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
+              {user ? (
+                <TabsTrigger value="my-agents" className="flex-1 gap-2">
+                  <Lock className="w-4 h-4" />
+                  My Agents
+                  {userAgents.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                      {userAgents.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              ) : null}
               <TabsTrigger value="public-agents" className="flex-1 gap-2">
                 <Globe className="w-4 h-4" />
                 Public
@@ -237,31 +404,41 @@ export default function Dashboard() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="my-agents" className="mt-0">
-              {filteredAgents.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
-                    <Bot className="w-8 h-8 text-primary" />
+            {user && (
+              <TabsContent value="my-agents" className="mt-0">
+                {isLoading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 6 }).map((_, i) => renderSkeletonCard(`user-${i}`))}
                   </div>
-                  <p className="text-muted-foreground mb-4">
-                    {agents.length === 0 ? "You haven't created any agents yet" : 'No agents match your search'}
-                  </p>
-                  {agents.length === 0 && (
-                    <Button variant="hero" onClick={() => navigate('/create')}>
-                      <Plus className="w-4 h-4" />
-                      Create Agent
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredAgents.map((agent, index) => renderAgentCard(agent, index, true))}
-                </div>
-              )}
-            </TabsContent>
+                ) : filteredUserAgents.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
+                      <Bot className="w-8 h-8 text-primary" />
+                    </div>
+                    <p className="text-muted-foreground mb-4">
+                      {userAgents.length === 0 ? "You haven't created any agents yet" : 'No agents match your search'}
+                    </p>
+                    {userAgents.length === 0 && (
+                      <Button variant="hero" onClick={() => navigate('/create')}>
+                        <Plus className="w-4 h-4" />
+                        Create Agent
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredUserAgents.map((agent, index) => renderAgentCard(agent, index, true))}
+                  </div>
+                )}
+              </TabsContent>
+            )}
 
             <TabsContent value="public-agents" className="mt-0">
-              {filteredPublicAgents.length === 0 ? (
+              {isLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 6 }).map((_, i) => renderSkeletonCard(`public-${i}`))}
+                </div>
+              ) : filteredPublicAgents.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
                     <Globe className="w-8 h-8 text-primary" />
@@ -275,24 +452,33 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredPublicAgents.map((agent, index) => renderAgentCard(agent, index, false))}
+                  {filteredPublicAgents.map((agent, index) => {
+                    const isOwner = agent.userId === user?.id;
+                    return renderAgentCard(agent, index, isOwner);
+                  })}
                 </div>
               )}
             </TabsContent>
           </Tabs>
-        )}
+        
       </main>
 
       <EditAgentSheet
         agent={editAgent}
         open={!!editAgent}
-        onOpenChange={(open) => !open && setEditAgent(null)}
+        onOpenChange={(open) => {
+          if (!open) setEditAgent(null);
+        }}
+        onSaved={() => onAgentEdited()}
       />
-      
+
       <DeleteAgentDialog
         agent={deleteAgentState}
         open={!!deleteAgentState}
-        onOpenChange={(open) => !open && setDeleteAgentState(null)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteAgentState(null);
+        }}
+        onDeleted={() => onAgentDeleted()}
       />
     </div>
   );

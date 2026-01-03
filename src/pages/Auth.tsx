@@ -101,9 +101,7 @@ export default function Auth() {
         <div className="w-full max-w-md mx-auto space-y-8">
           {/* Logo */}
           <div className="text-center space-y-4">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-primary mx-auto flex items-center justify-center shadow-glow">
-              <Bot className="w-10 h-10 text-primary-foreground" />
-            </div>
+           <img src="/app-icon.png" alt="App-icon" className="h-16 w-16 mx-auto" />
             <div>
               <h1 className="text-3xl font-bold text-foreground">PocketAgent</h1>
               <p className="text-muted-foreground">
