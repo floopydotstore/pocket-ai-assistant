@@ -1,39 +1,112 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Check, Sparkles, AlertCircle, Globe, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Check, Sparkles, AlertCircle, Globe, Lock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { useAgentSync } from '@/hooks/useAgentSync';
+import { useAuth } from '@/hooks/useAuth';
 import { TEMPLATES, type AgentTemplate, type Agent } from '@/types/agent';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
 type WizardStep = 'template' | 'name' | 'settings' | 'confirm';
 
 const STEPS: WizardStep[] = ['template', 'name', 'settings', 'confirm'];
 
+interface UserTemplateData {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string;
+  samplePrompt: string | null;
+  sampleOutput: string | null;
+  category: string;
+}
+
 export default function CreateAgent() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
   const { createAgent } = useAgentSync();
   
   const [currentStep, setCurrentStep] = useState<WizardStep>('template');
   const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null);
+  const [selectedUserTemplate, setSelectedUserTemplate] = useState<UserTemplateData | null>(null);
+  const [userTemplates, setUserTemplates] = useState<UserTemplateData[]>([]);
   const [agentName, setAgentName] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
   const [temperature, setTemperature] = useState([0.7]);
   const [maxTokens, setMaxTokens] = useState([500]);
   const [isPublic, setIsPublic] = useState(false);
 
+  // Fetch user templates
+  useEffect(() => {
+    const fetchUserTemplates = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('user_templates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setUserTemplates(
+          data.map((row) => ({
+            id: row.id,
+            name: row.name,
+            description: row.description,
+            icon: row.icon || '🤖',
+            samplePrompt: row.sample_prompt,
+            sampleOutput: row.sample_output,
+            category: row.category || 'Custom',
+          }))
+        );
+      }
+    };
+
+    fetchUserTemplates();
+  }, [user]);
+
+  // Handle template preselection from navigation state
+  useEffect(() => {
+    const state = location.state as { templateId?: string; isUserTemplate?: boolean } | null;
+    if (state?.templateId) {
+      if (state.isUserTemplate) {
+        // Find user template and select it
+        const userTemplate = userTemplates.find((t) => t.id === state.templateId);
+        if (userTemplate) {
+          setSelectedUserTemplate(userTemplate);
+          setSelectedTemplate(null);
+          setCustomPrompt(userTemplate.samplePrompt || '');
+          setCurrentStep('name');
+        }
+      } else {
+        // Find default template
+        const defaultTemplate = TEMPLATES.find((t) => t.id === state.templateId);
+        if (defaultTemplate) {
+          setSelectedTemplate(defaultTemplate.id);
+          setSelectedUserTemplate(null);
+          setCustomPrompt(defaultTemplate.samplePrompt);
+          setCurrentStep('name');
+        }
+      }
+    }
+  }, [location.state, userTemplates]);
+
   const stepIndex = STEPS.indexOf(currentStep);
   const template = TEMPLATES.find((t) => t.id === selectedTemplate);
+  const activeTemplate = selectedUserTemplate || template;
 
   const canProceed = () => {
     switch (currentStep) {
       case 'template':
-        return selectedTemplate !== null;
+        return selectedTemplate !== null || selectedUserTemplate !== null;
       case 'name':
         return agentName.trim().length >= 2;
       case 'settings':
@@ -65,9 +138,8 @@ export default function CreateAgent() {
   };
 
   const handleCreate = async () => {
-    if (!selectedTemplate || !template) return;
+    if (!activeTemplate) return;
 
-    // Generate UUID compatible with all environments
     const generateUUID = () => {
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = Math.random() * 16 | 0;
@@ -76,11 +148,13 @@ export default function CreateAgent() {
       });
     };
 
+    const templateId = selectedUserTemplate ? 'custom' : selectedTemplate!;
+
     const newAgent: Agent = {
       id: generateUUID(),
       name: agentName.trim(),
-      template: selectedTemplate,
-      prompt: customPrompt || template.samplePrompt,
+      template: templateId as AgentTemplate,
+      prompt: customPrompt || (activeTemplate as any).samplePrompt || '',
       temperature: temperature[0],
       maxTokens: maxTokens[0],
       createdAt: new Date().toISOString(),
@@ -90,6 +164,19 @@ export default function CreateAgent() {
 
     await createAgent(newAgent);
     navigate(`/chat/${newAgent.id}`);
+  };
+
+  const handleSelectDefaultTemplate = (t: AgentTemplate) => {
+    setSelectedTemplate(t);
+    setSelectedUserTemplate(null);
+    const tmpl = TEMPLATES.find((x) => x.id === t);
+    if (tmpl) setCustomPrompt(tmpl.samplePrompt);
+  };
+
+  const handleSelectUserTemplate = (t: UserTemplateData) => {
+    setSelectedUserTemplate(t);
+    setSelectedTemplate(null);
+    setCustomPrompt(t.samplePrompt || '');
   };
 
   return (
@@ -120,11 +207,10 @@ export default function CreateAgent() {
         {currentStep === 'template' && (
           <TemplateStep
             selected={selectedTemplate}
-            onSelect={(t) => {
-              setSelectedTemplate(t);
-              const tmpl = TEMPLATES.find((x) => x.id === t);
-              if (tmpl) setCustomPrompt(tmpl.samplePrompt);
-            }}
+            selectedUserTemplate={selectedUserTemplate}
+            userTemplates={userTemplates}
+            onSelectDefault={handleSelectDefaultTemplate}
+            onSelectUserTemplate={handleSelectUserTemplate}
           />
         )}
 
@@ -134,7 +220,7 @@ export default function CreateAgent() {
             prompt={customPrompt}
             onNameChange={setAgentName}
             onPromptChange={setCustomPrompt}
-            template={template}
+            template={activeTemplate}
           />
         )}
 
@@ -152,7 +238,7 @@ export default function CreateAgent() {
         {currentStep === 'confirm' && (
           <ConfirmStep
             name={agentName}
-            template={template}
+            template={activeTemplate}
             prompt={customPrompt}
             temperature={temperature[0]}
             maxTokens={maxTokens[0]}
@@ -189,10 +275,16 @@ export default function CreateAgent() {
 
 function TemplateStep({
   selected,
-  onSelect,
+  selectedUserTemplate,
+  userTemplates,
+  onSelectDefault,
+  onSelectUserTemplate,
 }: {
   selected: AgentTemplate | null;
-  onSelect: (t: AgentTemplate) => void;
+  selectedUserTemplate: UserTemplateData | null;
+  userTemplates: UserTemplateData[];
+  onSelectDefault: (t: AgentTemplate) => void;
+  onSelectUserTemplate: (t: UserTemplateData) => void;
 }) {
   return (
     <div className="animate-fade-in">
@@ -200,36 +292,89 @@ function TemplateStep({
       <p className="text-muted-foreground text-sm mb-6">
         Select a template to get started. You can customize it later.
       </p>
-      <div className="space-y-3">
-        {TEMPLATES.map((template, index) => (
-          <Card
-            key={template.id}
-            variant={selected === template.id ? 'elevated' : 'interactive'}
-            className={cn(
-              'animate-slide-up',
-              selected === template.id && 'border-primary ring-2 ring-primary/20'
-            )}
-            style={{ animationDelay: `${index * 50}ms` }}
-            onClick={() => onSelect(template.id)}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-2xl">
-                  {template.icon}
-                </div>
-                <div className="flex-1">
-                  <CardTitle className="text-base">{template.name}</CardTitle>
-                  <CardDescription className="text-xs">{template.description}</CardDescription>
-                </div>
-                {selected === template.id && (
-                  <div className="w-6 h-6 rounded-full gradient-primary flex items-center justify-center">
-                    <Check className="w-4 h-4 text-primary-foreground" />
-                  </div>
+      
+      {/* User Templates */}
+      {userTemplates.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            My Templates
+          </h3>
+          <div className="space-y-3">
+            {userTemplates.map((template, index) => (
+              <Card
+                key={template.id}
+                variant={selectedUserTemplate?.id === template.id ? 'elevated' : 'interactive'}
+                className={cn(
+                  'animate-slide-up',
+                  selectedUserTemplate?.id === template.id && 'border-primary ring-2 ring-primary/20'
                 )}
-              </div>
-            </CardHeader>
-          </Card>
-        ))}
+                style={{ animationDelay: `${index * 50}ms` }}
+                onClick={() => onSelectUserTemplate(template)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-2xl">
+                      {template.icon}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-base">{template.name}</CardTitle>
+                        <Badge variant="secondary" className="text-xs h-5">
+                          <User className="w-3 h-3 mr-1" />
+                          Custom
+                        </Badge>
+                      </div>
+                      <CardDescription className="text-xs">{template.description || 'No description'}</CardDescription>
+                    </div>
+                    {selectedUserTemplate?.id === template.id && (
+                      <div className="w-6 h-6 rounded-full gradient-primary flex items-center justify-center">
+                        <Check className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Default Templates */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          Default Templates
+        </h3>
+        <div className="space-y-3">
+          {TEMPLATES.map((template, index) => (
+            <Card
+              key={template.id}
+              variant={selected === template.id ? 'elevated' : 'interactive'}
+              className={cn(
+                'animate-slide-up',
+                selected === template.id && 'border-primary ring-2 ring-primary/20'
+              )}
+              style={{ animationDelay: `${(userTemplates.length + index) * 50}ms` }}
+              onClick={() => onSelectDefault(template.id)}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-2xl">
+                    {template.icon}
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base">{template.name}</CardTitle>
+                    <CardDescription className="text-xs">{template.description}</CardDescription>
+                  </div>
+                  {selected === template.id && (
+                    <div className="w-6 h-6 rounded-full gradient-primary flex items-center justify-center">
+                      <Check className="w-4 h-4 text-primary-foreground" />
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -246,7 +391,7 @@ function NameStep({
   prompt: string;
   onNameChange: (v: string) => void;
   onPromptChange: (v: string) => void;
-  template?: typeof TEMPLATES[0];
+  template?: { name?: string; samplePrompt?: string | null; icon?: string };
 }) {
   return (
     <div className="space-y-6 animate-fade-in">
@@ -279,9 +424,11 @@ function NameStep({
             rows={5}
             className="w-full px-4 py-3 rounded-xl border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
           />
-          <p className="text-xs text-muted-foreground">
-            Default: {template?.samplePrompt}
-          </p>
+          {template?.samplePrompt && (
+            <p className="text-xs text-muted-foreground">
+              Default: {template.samplePrompt}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -382,7 +529,7 @@ function ConfirmStep({
   isPublic,
 }: {
   name: string;
-  template?: typeof TEMPLATES[0];
+  template?: { name?: string; icon?: string };
   prompt: string;
   temperature: number;
   maxTokens: number;
@@ -403,7 +550,7 @@ function ConfirmStep({
             </div>
             <div>
               <CardTitle className="text-lg">{name}</CardTitle>
-              <CardDescription>{template?.name}</CardDescription>
+              <CardDescription>{template?.name || 'Custom Template'}</CardDescription>
             </div>
           </div>
         </CardHeader>

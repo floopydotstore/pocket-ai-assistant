@@ -26,6 +26,7 @@ interface AgentState {
   setCloudSync: (enabled: boolean) => void;
   
   exportData: () => string;
+  clearUserData: (userId?: string) => void;
   clearAllData: () => void;
 }
 
@@ -94,7 +95,7 @@ export const useAgentStore = create<AgentState>()(
 
       addHistoryEntry: (entry) =>
         set((state) => ({
-          history: [entry, ...state.history].slice(0, 100), // Keep last 100 entries
+          history: [entry, ...state.history].slice(0, 100),
         })),
 
       deleteHistoryEntry: (id) =>
@@ -117,6 +118,34 @@ export const useAgentStore = create<AgentState>()(
           exportedAt: new Date().toISOString(),
         }, null, 2);
       },
+
+      // Clear only current user's data (agents they own)
+      clearUserData: (userId?: string) =>
+        set((state) => {
+          if (!userId) {
+            // If no userId, just clear local agents without userId (local-only agents)
+            return {
+              agents: state.agents.filter((a) => a.userId && a.userId !== ''),
+              conversations: {},
+              history: [],
+            };
+          }
+          
+          // Filter out only the user's agents
+          const userAgentIds = new Set(
+            state.agents.filter((a) => a.userId === userId).map((a) => a.id)
+          );
+          
+          return {
+            agents: state.agents.filter((a) => a.userId !== userId),
+            conversations: Object.fromEntries(
+              Object.entries(state.conversations).filter(
+                ([agentId]) => !userAgentIds.has(agentId)
+              )
+            ),
+            history: state.history.filter((h) => !userAgentIds.has(h.agentId)),
+          };
+        }),
 
       clearAllData: () =>
         set({

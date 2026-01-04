@@ -15,19 +15,29 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet';
 import { useAgentSync } from '@/hooks/useAgentSync';
-import { TEMPLATES, type Agent } from '@/types/agent';
+import { TEMPLATES } from '@/types/agent';
 import { toast } from 'sonner';
 
-interface EditAgentSheetProps {
-  agent: Agent | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface AgentForEdit {
+  id: string;
+  name: string;
+  template: string;
+  prompt?: string;
+  temperature?: number;
+  maxTokens?: number;
+  isPublic?: boolean;
 }
 
-export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProps) {
+interface EditAgentSheetProps {
+  agent: AgentForEdit | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
+}
+
+export function EditAgentSheet({ agent, open, onOpenChange, onSaved }: EditAgentSheetProps) {
   const { updateAgent } = useAgentSync();
 
-  // default sensible values
   const DEFAULT_TEMPERATURE = 0.7;
   const DEFAULT_MAX_TOKENS = 500;
 
@@ -42,12 +52,10 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
     if (agent) {
       setName(agent.name ?? '');
       setPrompt(agent.prompt ?? '');
-      // defensive fallbacks if DB values are null/undefined
       setTemperature([typeof agent.temperature === 'number' ? agent.temperature : DEFAULT_TEMPERATURE]);
       setMaxTokens([typeof agent.maxTokens === 'number' ? agent.maxTokens : DEFAULT_MAX_TOKENS]);
       setIsPublic(Boolean(agent.isPublic));
     } else {
-      // reset when no agent
       setName('');
       setPrompt('');
       setTemperature([DEFAULT_TEMPERATURE]);
@@ -78,6 +86,7 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
 
       toast.success('Agent updated');
       onOpenChange(false);
+      onSaved?.();
     } catch (err) {
       console.error('Failed to update agent', err);
       toast.error('Failed to save agent. See console for details.');
@@ -88,7 +97,6 @@ export function EditAgentSheet({ agent, open, onOpenChange }: EditAgentSheetProp
 
   if (!agent) return null;
 
-  // safe values for display
   const displayTemp = (typeof temperature?.[0] === 'number' ? temperature[0] : DEFAULT_TEMPERATURE);
   const displayMaxTokens = (typeof maxTokens?.[0] === 'number' ? maxTokens[0] : DEFAULT_MAX_TOKENS);
 

@@ -13,6 +13,7 @@ import {
   Globe,
   Lock,
   Users,
+  Heart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -29,49 +30,76 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { EditAgentSheet } from '@/components/agents/EditAgentSheet';
 import { DeleteAgentDialog } from '@/components/agents/DeleteAgentDialog';
+import { TEMPLATES, type Agent } from '@/types/agent';
+import { toast } from 'sonner';
 
-// Agent type used by the component (maps DB fields to camelCase)
-export type Agent = {
-  id: string;
-  name: string;
-  template: string;
-  userId: string;
-  isPublic: boolean;
-  lastRunAt?: string | null;
-  runCount?: number | null;
-  createdAt?: string | null;
+// Extended agent type with DB fields
+type DashboardAgent = Agent & {
+  creatorName?: string | null;
+  likesCount?: number;
+  isLiked?: boolean;
 };
 
-const mapRowToAgent = (row: any): Agent => ({
+const mapRowToAgent = (row: any, userId?: string, likes?: { agent_id: string; user_id: string }[]): DashboardAgent => ({
   id: row.id,
   name: row.name,
   template: row.template,
+  prompt: row.prompt ?? '',
+  temperature: row.temperature ?? 0.7,
+  maxTokens: row.max_tokens ?? 500,
   userId: row.user_id ?? row.userId ?? row.user,
   isPublic: !!(row.is_public ?? row.isPublic),
-  lastRunAt: row.last_run_at ?? row.lastRunAt ?? null,
+  lastRunAt: row.last_run_at ?? row.lastRunAt ?? undefined,
   runCount: row.run_count ?? row.runCount ?? 0,
-  createdAt: row.created_at ?? row.createdAt ?? null,
+  createdAt: row.created_at ?? row.createdAt ?? new Date().toISOString(),
+  creatorName: row.creator_name ?? null,
+  likesCount: row.likes_count ?? 0,
+  isLiked: likes?.some(l => l.agent_id === row.id && l.user_id === userId) ?? false,
 });
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [editAgent, setEditAgent] = useState<Agent | null>(null);
-  const [deleteAgentState, setDeleteAgentState] = useState<Agent | null>(null);
+  const [editAgent, setEditAgent] = useState<DashboardAgent | null>(null);
+  const [deleteAgentState, setDeleteAgentState] = useState<DashboardAgent | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [userAgents, setUserAgents] = useState<Agent[]>([]);
-  const [publicAgents, setPublicAgents] = useState<Agent[]>([]);
+  const [userAgents, setUserAgents] = useState<DashboardAgent[]>([]);
+  const [publicAgents, setPublicAgents] = useState<DashboardAgent[]>([]);
+  const [userLikes, setUserLikes] = useState<{ agent_id: string; user_id: string }[]>([]);
   const [activeTab, setActiveTab] = useState<'my-agents' | 'public-agents'>(() =>
     user ? 'my-agents' : 'public-agents'
   );
 
-  // keep tab synced to auth state (if user logs out -> show public)
+  // Keep tab synced to auth state
   useEffect(() => {
-    setActiveTab(user ? 'my-agents' : 'public-agents');
+    if (!user) {
+      setActiveTab('public-agents');
+    }
   }, [user]);
 
-  // fetch user's agents
+  // Fetch user likes
+  const fetchUserLikes = useCallback(async () => {
+    if (!user) {
+      setUserLikes([]);
+      return [];
+    }
+    
+    const { data, error } = await supabase
+      .from('agent_likes')
+      .select('agent_id, user_id')
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error fetching likes:', error);
+      return [];
+    }
+    
+    setUserLikes(data || []);
+    return data || [];
+  }, [user]);
+
+  // Fetch user's agents
   const fetchUserAgents = useCallback(async () => {
     if (!user) {
       setUserAgents([]);
@@ -79,6 +107,8 @@ export default function Dashboard() {
     }
     setIsLoading(true);
     try {
+      const likes = await fetchUserLikes();
+      
       const { data, error } = await supabase
         .from('agents')
         .select('*')
@@ -86,51 +116,67 @@ export default function Dashboard() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setUserAgents((data ?? []).map(mapRowToAgent));
+      setUserAgents((data ?? []).map(row => mapRowToAgent(row, user.id, likes)));
     } catch (err) {
       console.error('Error fetching user agents', err);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, fetchUserLikes]);
 
-  // fetch public agents
+  // Fetch public agents with likes count
   const fetchPublicAgents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const likes = user ? await fetchUserLikes() : [];
+      
+      // Fetch agents
+      const { data: agentsData, error: agentsError } = await supabase
         .from('agents')
         .select('*')
         .eq('is_public', true)
         .order('created_at', { ascending: false })
-        .limit(200); // limit to avoid huge payloads
-      if (error) throw error;
-      setPublicAgents((data ?? []).map(mapRowToAgent));
+        .limit(200);
+
+      if (agentsError) throw agentsError;
+
+      // Fetch likes counts
+      const { data: likesData, error: likesError } = await supabase
+        .from('agent_likes')
+        .select('agent_id');
+
+      if (likesError) throw likesError;
+
+      // Count likes per agent
+      const likesCountMap: Record<string, number> = {};
+      (likesData || []).forEach(like => {
+        likesCountMap[like.agent_id] = (likesCountMap[like.agent_id] || 0) + 1;
+      });
+
+      const agents = (agentsData ?? []).map(row => ({
+        ...mapRowToAgent(row, user?.id, likes),
+        likesCount: likesCountMap[row.id] || 0,
+      }));
+
+      setPublicAgents(agents);
     } catch (err) {
       console.error('Error fetching public agents', err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user, fetchUserLikes]);
 
-  // initial and on-user-change load
+  // Initial and on-user-change load
   useEffect(() => {
-    // Always fetch public agents
     fetchPublicAgents();
-    console.log('====================================');
-    console.log(filteredPublicAgents.length);
-    console.log('====================================');
-
-    // fetch user agents only if logged in
     if (user) {
       fetchUserAgents();
     } else {
       setUserAgents([]);
     }
-    // we intentionally do not add fetchUserAgents/fetchPublicAgents to deps (callbacks are stable)
   }, [user, fetchPublicAgents, fetchUserAgents]);
 
-  // listen to realtime changes on agents table to keep lists fresh (optional)
+  // Listen to realtime changes
   useEffect(() => {
     const subscription = supabase
       .channel('public:agents')
@@ -156,19 +202,13 @@ export default function Dashboard() {
   );
 
   const filteredPublicAgents = publicAgents
-  // if user is logged in, exclude their own public agents; if not logged in, keep all public agents
-  .filter((a) => (user ? a.userId !== user.id : true))  // ← Changed false to true
-  .filter(
-    (a) =>
-      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.template.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    .filter((a) => (user ? a.userId !== user.id : true))
+    .filter(
+      (a) =>
+        a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.template.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
-  // Template helper — you likely have this constant elsewhere
-  const TEMPLATES = [
-    { id: 'default', name: 'Default', icon: '🤖' },
-    // Add your templates...
-  ];
   const getTemplateInfo = (templateId: string) =>
     TEMPLATES.find((t) => t.id === templateId) ?? { id: templateId, name: templateId, icon: '🤖' };
 
@@ -186,30 +226,37 @@ export default function Dashboard() {
     return `${days}d ago`;
   };
 
-  // update agent (used when running to update lastRunAt/runCount)
-  const updateAgentRun = async (agentId: string) => {
-    try {
-      const now = new Date().toISOString();
-      const { data, error } = await supabase
-        .from('agents')
-        .update({ last_run_at: now })
-        .eq('id', agentId)
-        .select();
-      if (error) throw error;
-      fetchPublicAgents();
-      if (user) fetchUserAgents();
-      return data?.[0] ? mapRowToAgent(data[0]) : null;
-    } catch (err) {
-      console.error('Error updating agent run', err);
-      return null;
-    }
+  const handleQuickRun = async (agentId: string) => {
+    navigate(`/chat/${agentId}`);
   };
 
-  const handleQuickRun = async (agentId: string, isOwner: boolean) => {
-    if (isOwner) {
-      await updateAgentRun(agentId);
+  const handleLike = async (agentId: string, isCurrentlyLiked: boolean) => {
+    if (!user) {
+      toast.error('Sign in to like agents');
+      return;
     }
-    navigate(`/chat/${agentId}`);
+
+    try {
+      if (isCurrentlyLiked) {
+        // Unlike
+        await supabase
+          .from('agent_likes')
+          .delete()
+          .eq('agent_id', agentId)
+          .eq('user_id', user.id);
+      } else {
+        // Like
+        await supabase
+          .from('agent_likes')
+          .insert({ agent_id: agentId, user_id: user.id });
+      }
+
+      // Refresh public agents to update like counts
+      fetchPublicAgents();
+    } catch (err) {
+      console.error('Error toggling like:', err);
+      toast.error('Failed to update like');
+    }
   };
 
   const onAgentEdited = async () => {
@@ -224,7 +271,7 @@ export default function Dashboard() {
     setDeleteAgentState(null);
   };
 
-  const renderAgentCard = (agent: Agent, index: number, isOwner: boolean) => {
+  const renderAgentCard = (agent: DashboardAgent, index: number, isOwner: boolean) => {
     const template = getTemplateInfo(agent.template);
     return (
       <Card
@@ -254,12 +301,27 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {!isOwner && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleLike(agent.id, agent.isLiked || false);
+                  }}
+                >
+                  <Heart
+                    className={`w-4 h-4 ${agent.isLiked ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`}
+                  />
+                </Button>
+              )}
               <Button
                 variant="soft"
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleQuickRun(agent.id, isOwner);
+                  handleQuickRun(agent.id);
                 }}
                 className="h-8 gap-1.5"
               >
@@ -316,10 +378,24 @@ export default function Dashboard() {
               </>
             )}
             {!isOwner && (
-              <span className="flex items-center gap-1">
-                <Users className="w-3.5 h-3.5" />
-                Community agent
-              </span>
+              <>
+                {agent.creatorName && (
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" />
+                    by {agent.creatorName}
+                  </span>
+                )}
+                {!agent.creatorName && (
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" />
+                    Community agent
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Heart className="w-3.5 h-3.5" />
+                  {agent.likesCount || 0}
+                </span>
+              </>
             )}
           </div>
         </CardContent>
@@ -327,7 +403,6 @@ export default function Dashboard() {
     );
   };
 
-  // Skeleton card to show while loading
   const renderSkeletonCard = (key: string | number) => (
     <div
       key={key}
@@ -338,15 +413,15 @@ export default function Dashboard() {
     >
       <div className="flex items-start justify-between p-4 rounded-lg border border-border bg-card animate-pulse">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gray-300 dark:bg-gray-700" />
+          <div className="w-11 h-11 rounded-xl bg-muted" />
           <div className="space-y-2">
-            <div className="w-40 h-4 rounded bg-gray-300 dark:bg-gray-700" />
-            <div className="w-28 h-3 rounded bg-gray-200 dark:bg-gray-600 mt-2" />
+            <div className="w-40 h-4 rounded bg-muted" />
+            <div className="w-28 h-3 rounded bg-muted mt-2" />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-16 h-8 rounded bg-gray-300 dark:bg-gray-700" />
-          <div className="w-8 h-8 rounded bg-gray-300 dark:bg-gray-700" />
+          <div className="w-16 h-8 rounded bg-muted" />
+          <div className="w-8 h-8 rounded bg-muted" />
         </div>
       </div>
     </div>
@@ -378,89 +453,86 @@ export default function Dashboard() {
 
       {/* Content */}
       <main className="px-5 pb-24">
-        
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            {/* Show "My Agents" tab only when logged in */}
-            <TabsList className="w-full mb-4">
-              {user ? (
-                <TabsTrigger value="my-agents" className="flex-1 gap-2">
-                  <Lock className="w-4 h-4" />
-                  My Agents
-                  {userAgents.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                      {userAgents.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              ) : null}
-              <TabsTrigger value="public-agents" className="flex-1 gap-2">
-                <Globe className="w-4 h-4" />
-                Public
-                {filteredPublicAgents.length > 0 && (
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+          <TabsList className="w-full mb-4">
+            {user && (
+              <TabsTrigger value="my-agents" className="flex-1 gap-2">
+                <Lock className="w-4 h-4" />
+                My Agents
+                {userAgents.length > 0 && (
                   <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                    {filteredPublicAgents.length}
+                    {userAgents.length}
                   </Badge>
                 )}
               </TabsTrigger>
-            </TabsList>
-
-            {user && (
-              <TabsContent value="my-agents" className="mt-0">
-                {isLoading ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 6 }).map((_, i) => renderSkeletonCard(`user-${i}`))}
-                  </div>
-                ) : filteredUserAgents.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
-                      <Bot className="w-8 h-8 text-primary" />
-                    </div>
-                    <p className="text-muted-foreground mb-4">
-                      {userAgents.length === 0 ? "You haven't created any agents yet" : 'No agents match your search'}
-                    </p>
-                    {userAgents.length === 0 && (
-                      <Button variant="hero" onClick={() => navigate('/create')}>
-                        <Plus className="w-4 h-4" />
-                        Create Agent
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredUserAgents.map((agent, index) => renderAgentCard(agent, index, true))}
-                  </div>
-                )}
-              </TabsContent>
             )}
+            <TabsTrigger value="public-agents" className="flex-1 gap-2">
+              <Globe className="w-4 h-4" />
+              Public
+              {filteredPublicAgents.length > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                  {filteredPublicAgents.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="public-agents" className="mt-0">
+          {user && (
+            <TabsContent value="my-agents" className="mt-0">
               {isLoading ? (
                 <div className="space-y-3">
-                  {Array.from({ length: 6 }).map((_, i) => renderSkeletonCard(`public-${i}`))}
+                  {Array.from({ length: 6 }).map((_, i) => renderSkeletonCard(`user-${i}`))}
                 </div>
-              ) : filteredPublicAgents.length === 0 ? (
+              ) : filteredUserAgents.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
-                    <Globe className="w-8 h-8 text-primary" />
+                    <Bot className="w-8 h-8 text-primary" />
                   </div>
-                  <p className="text-muted-foreground">
-                    {publicAgents.length === 0 ? 'No public agents available yet' : 'No public agents match your search'}
+                  <p className="text-muted-foreground mb-4">
+                    {userAgents.length === 0 ? "You haven't created any agents yet" : 'No agents match your search'}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Create your first public agent to share with the community!
-                  </p>
+                  {userAgents.length === 0 && (
+                    <Button variant="hero" onClick={() => navigate('/create')}>
+                      <Plus className="w-4 h-4" />
+                      Create Agent
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredPublicAgents.map((agent, index) => {
-                    const isOwner = agent.userId === user?.id;
-                    return renderAgentCard(agent, index, isOwner);
-                  })}
+                  {filteredUserAgents.map((agent, index) => renderAgentCard(agent, index, true))}
                 </div>
               )}
             </TabsContent>
-          </Tabs>
-        
+          )}
+
+          <TabsContent value="public-agents" className="mt-0">
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, i) => renderSkeletonCard(`public-${i}`))}
+              </div>
+            ) : filteredPublicAgents.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
+                  <Globe className="w-8 h-8 text-primary" />
+                </div>
+                <p className="text-muted-foreground">
+                  {publicAgents.length === 0 ? 'No public agents available yet' : 'No public agents match your search'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Create your first public agent to share with the community!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredPublicAgents.map((agent, index) => {
+                  const isOwner = agent.userId === user?.id;
+                  return renderAgentCard(agent, index, isOwner);
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       <EditAgentSheet
@@ -469,7 +541,7 @@ export default function Dashboard() {
         onOpenChange={(open) => {
           if (!open) setEditAgent(null);
         }}
-        onSaved={() => onAgentEdited()}
+        onSaved={onAgentEdited}
       />
 
       <DeleteAgentDialog
@@ -478,26 +550,8 @@ export default function Dashboard() {
         onOpenChange={(open) => {
           if (!open) setDeleteAgentState(null);
         }}
-        onDeleted={() => onAgentDeleted()}
+        onDeleted={onAgentDeleted}
       />
-    </div>
-  );
-}
-
-function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
-      <div className="w-20 h-20 rounded-3xl bg-accent flex items-center justify-center mb-6">
-        <Bot className="w-10 h-10 text-primary" />
-      </div>
-      <h2 className="text-xl font-semibold mb-2 text-foreground">No agents yet</h2>
-      <p className="text-muted-foreground mb-6 max-w-xs">
-        Create your first AI agent to start automating micro-tasks
-      </p>
-      <Button variant="hero" size="lg" onClick={onCreateClick}>
-        <Plus className="w-5 h-5" />
-        Create Agent
-      </Button>
     </div>
   );
 }
