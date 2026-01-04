@@ -38,6 +38,7 @@ export default function Settings() {
   const cloudSyncEnabled = useAgentStore((s) => s.cloudSyncEnabled);
   const setCloudSync = useAgentStore((s) => s.setCloudSync);
   const exportData = useAgentStore((s) => s.exportData);
+  const clearUserData = useAgentStore((s) => s.clearUserData);
   const clearAllData = useAgentStore((s) => s.clearAllData);
 
   const handleExport = () => {
@@ -55,8 +56,14 @@ export default function Settings() {
   };
 
   const handleClearData = () => {
-    clearAllData();
-    toast({ description: 'All local data cleared' });
+    // Clear only current user's data if logged in, otherwise clear all local data
+    if (user) {
+      clearUserData(user.id);
+      toast({ description: 'Your data cleared successfully' });
+    } else {
+      clearAllData();
+      toast({ description: 'All local data cleared' });
+    }
   };
 
   const handleSignOut = async () => {
@@ -67,7 +74,9 @@ export default function Settings() {
   const handleDeleteAccount = async () => {
     const { error } = await deleteAccount();
     if (!error) {
-      clearAllData();
+      if (user) {
+        clearUserData(user.id);
+      }
       navigate('/onboarding');
     }
   };
@@ -173,17 +182,20 @@ export default function Settings() {
                   <div>
                     <SettingRow
                       icon={Trash2}
-                      title="Clear local data"
-                      description="Delete all locally stored data"
+                      title="Clear my data"
+                      description={user ? "Delete your agents and history" : "Delete all locally stored data"}
                       destructive
                     />
                   </div>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Clear local data?</AlertDialogTitle>
+                    <AlertDialogTitle>Clear your data?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will delete all locally stored agents and history. Cloud data will remain intact if synced.
+                      {user 
+                        ? "This will delete your locally stored agents and history. Cloud data will remain intact if synced."
+                        : "This will delete all locally stored agents and history."
+                      }
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

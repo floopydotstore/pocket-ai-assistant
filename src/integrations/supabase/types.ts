@@ -14,10 +14,40 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_likes: {
+        Row: {
+          agent_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_likes_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           color: string | null
           created_at: string
+          creator_name: string | null
           description: string | null
           icon: string | null
           id: string
@@ -33,6 +63,7 @@ export type Database = {
         Insert: {
           color?: string | null
           created_at?: string
+          creator_name?: string | null
           description?: string | null
           icon?: string | null
           id?: string
@@ -48,6 +79,7 @@ export type Database = {
         Update: {
           color?: string | null
           created_at?: string
+          creator_name?: string | null
           description?: string | null
           icon?: string | null
           id?: string
@@ -152,6 +184,45 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_templates: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          sample_output: string | null
+          sample_prompt: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          sample_output?: string | null
+          sample_prompt?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          sample_output?: string | null
+          sample_prompt?: string | null
           updated_at?: string
           user_id?: string
         }

@@ -46,8 +46,6 @@ export function useAgentSync() {
 
   // Fetch public agents from all users
   const fetchPublicAgents = useCallback(async (): Promise<Agent[]> => {
-    if (!user) return [];
-
     const { data, error } = await supabase
       .from('agents')
       .select('*')
@@ -72,6 +70,19 @@ export function useAgentSync() {
       isPublic: row.is_public ?? false,
       userId: row.user_id,
     }));
+  }, []);
+
+  // Get user display name for creator_name
+  const getDisplayName = useCallback(async (): Promise<string | null> => {
+    if (!user) return null;
+    
+    const { data } = await supabase
+      .from('profiles')
+      .select('display_name, email')
+      .eq('user_id', user.id)
+      .single();
+    
+    return data?.display_name || data?.email?.split('@')[0] || null;
   }, [user]);
 
   // Create agent in cloud
@@ -84,6 +95,9 @@ export function useAgentSync() {
         return agent;
       }
 
+      // Get creator name for public agents
+      const creatorName = agent.isPublic ? await getDisplayName() : null;
+
       const { error } = await supabase.from('agents').insert({
         id: agent.id,
         user_id: user!.id,
@@ -93,6 +107,7 @@ export function useAgentSync() {
         temperature: agent.temperature,
         max_tokens: agent.maxTokens,
         is_public: agent.isPublic,
+        creator_name: creatorName,
         description: null,
         color: 'primary',
         icon: 'bot',
@@ -106,7 +121,7 @@ export function useAgentSync() {
 
       return agent;
     },
-    [shouldSync, user, addAgentToStore]
+    [shouldSync, user, addAgentToStore, getDisplayName]
   );
 
   // Update agent in cloud
@@ -125,7 +140,14 @@ export function useAgentSync() {
       if (updates.prompt !== undefined) cloudUpdates.prompt = updates.prompt;
       if (updates.temperature !== undefined) cloudUpdates.temperature = updates.temperature;
       if (updates.maxTokens !== undefined) cloudUpdates.max_tokens = updates.maxTokens;
-      if (updates.isPublic !== undefined) cloudUpdates.is_public = updates.isPublic;
+      if (updates.isPublic !== undefined) {
+        cloudUpdates.is_public = updates.isPublic;
+        // Update creator_name when making public
+        if (updates.isPublic) {
+          const creatorName = await getDisplayName();
+          if (creatorName) cloudUpdates.creator_name = creatorName;
+        }
+      }
 
       if (Object.keys(cloudUpdates).length === 0) return;
 
@@ -140,7 +162,7 @@ export function useAgentSync() {
         toast.error('Failed to sync changes to cloud');
       }
     },
-    [shouldSync, user, updateAgentInStore]
+    [shouldSync, user, updateAgentInStore, getDisplayName]
   );
 
   // Delete agent from cloud

@@ -9,16 +9,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAgentSync } from '@/hooks/useAgentSync';
-import { type Agent } from '@/types/agent';
 import { toast } from 'sonner';
 
-interface DeleteAgentDialogProps {
-  agent: Agent | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface AgentForDelete {
+  id: string;
+  name: string;
 }
 
-export function DeleteAgentDialog({ agent, open, onOpenChange }: DeleteAgentDialogProps) {
+interface DeleteAgentDialogProps {
+  agent: AgentForDelete | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDeleted?: () => void;
+}
+
+export function DeleteAgentDialog({ agent, open, onOpenChange, onDeleted }: DeleteAgentDialogProps) {
   const { deleteAgent } = useAgentSync();
 
   const handleDelete = async () => {
@@ -27,6 +32,7 @@ export function DeleteAgentDialog({ agent, open, onOpenChange }: DeleteAgentDial
     await deleteAgent(agent.id);
     toast.success(`"${agent.name}" deleted`);
     onOpenChange(false);
+    onDeleted?.();
   };
 
   if (!agent) return null;
