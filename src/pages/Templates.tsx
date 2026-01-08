@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, ArrowRight, Plus, Trash2, User, MoreVertical, Pencil } from 'lucide-react';
+import { Sparkles, ArrowRight, Plus, Trash2, User, MoreVertical, Pencil, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +43,8 @@ export default function Templates() {
   const [isLoading, setIsLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<UserTemplate | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [deleteTemplate, setDeleteTemplate] = useState<UserTemplate | null>(null);
 
   // Keep tab synced to auth state
@@ -100,14 +103,44 @@ export default function Templates() {
     navigate('/create', { state: { templateId, isUserTemplate } });
   };
 
-  const groupedDefaultTemplates = TEMPLATES.reduce((acc, template) => {
+  // Get unique categories
+  const allCategories = useMemo(() => {
+    const defaultCats = [...new Set(TEMPLATES.map(t => t.category))];
+    const userCats = [...new Set(userTemplates.map(t => t.category))];
+    return [...new Set([...defaultCats, ...userCats])];
+  }, [userTemplates]);
+
+  // Filter templates by search and category
+  const filteredDefaultTemplates = useMemo(() => {
+    return TEMPLATES.filter(t => {
+      const matchesSearch = !searchQuery || 
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = !categoryFilter || t.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [searchQuery, categoryFilter]);
+
+  const filteredUserTemplates = useMemo(() => {
+    return userTemplates.filter(t => {
+      const matchesSearch = !searchQuery || 
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        t.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = !categoryFilter || t.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [userTemplates, searchQuery, categoryFilter]);
+
+  const groupedDefaultTemplates = filteredDefaultTemplates.reduce((acc, template) => {
     const category = template.category;
     if (!acc[category]) acc[category] = [];
     acc[category].push(template);
     return acc;
   }, {} as Record<string, typeof TEMPLATES>);
 
-  const groupedUserTemplates = userTemplates.reduce((acc, template) => {
+  const groupedUserTemplates = filteredUserTemplates.reduce((acc, template) => {
     const category = template.category;
     if (!acc[category]) acc[category] = [];
     acc[category].push(template);
@@ -238,7 +271,7 @@ export default function Templates() {
     <div className="min-h-screen bg-background safe-area-top">
       {/* Header */}
       <header className="px-5 pt-6 pb-4">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-primary" />
@@ -254,6 +287,38 @@ export default function Templates() {
               New
             </Button>
           )}
+        </div>
+
+        {/* Search */}
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search templates..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 h-11 bg-secondary/50 border-0"
+          />
+        </div>
+
+        {/* Category Filter */}
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-5 px-5 scrollbar-none">
+          <Badge
+            variant={categoryFilter === null ? "default" : "secondary"}
+            className="cursor-pointer whitespace-nowrap"
+            onClick={() => setCategoryFilter(null)}
+          >
+            All
+          </Badge>
+          {allCategories.map((category) => (
+            <Badge
+              key={category}
+              variant={categoryFilter === category ? "default" : "secondary"}
+              className="cursor-pointer whitespace-nowrap"
+              onClick={() => setCategoryFilter(category)}
+            >
+              {category}
+            </Badge>
+          ))}
         </div>
       </header>
 
@@ -289,18 +354,20 @@ export default function Templates() {
                     <div key={i} className="h-48 rounded-lg bg-muted animate-pulse" />
                   ))}
                 </div>
-              ) : userTemplates.length === 0 ? (
+              ) : filteredUserTemplates.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
                     <Sparkles className="w-8 h-8 text-primary" />
                   </div>
                   <p className="text-muted-foreground mb-4">
-                    You haven't created any templates yet
+                    {userTemplates.length === 0 ? "You haven't created any templates yet" : "No templates match your search"}
                   </p>
-                  <Button variant="hero" onClick={() => setCreateOpen(true)}>
-                    <Plus className="w-4 h-4" />
-                    Create Template
-                  </Button>
+                  {userTemplates.length === 0 && (
+                    <Button variant="hero" onClick={() => setCreateOpen(true)}>
+                      <Plus className="w-4 h-4" />
+                      Create Template
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <>
@@ -320,16 +387,25 @@ export default function Templates() {
           )}
 
           <TabsContent value="default-templates" className="mt-0">
-            {Object.entries(groupedDefaultTemplates).map(([category, templates]) => (
-              <div key={category} className="mb-8">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  {category}
-                </h2>
-                <div className="space-y-3">
-                  {templates.map((template, index) => renderDefaultTemplateCard(template, index))}
+            {filteredDefaultTemplates.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-8 h-8 text-primary" />
                 </div>
+                <p className="text-muted-foreground">No templates match your search</p>
               </div>
-            ))}
+            ) : (
+              Object.entries(groupedDefaultTemplates).map(([category, templates]) => (
+                <div key={category} className="mb-8">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    {category}
+                  </h2>
+                  <div className="space-y-3">
+                    {templates.map((template, index) => renderDefaultTemplateCard(template, index))}
+                  </div>
+                </div>
+              ))
+            )}
           </TabsContent>
         </Tabs>
       </main>
