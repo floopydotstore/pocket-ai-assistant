@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 
 export function useAgentSync() {
   const { user } = useAuth();
+  // Keep this selector to maintain hook order (even though we always sync when logged in)
+  useAgentStore((s) => s.cloudSyncEnabled);
   const addAgentToStore = useAgentStore((s) => s.addAgent);
   const updateAgentInStore = useAgentStore((s) => s.updateAgent);
   const deleteAgentFromStore = useAgentStore((s) => s.deleteAgent);
