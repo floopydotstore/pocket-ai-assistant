@@ -7,12 +7,12 @@ import { toast } from 'sonner';
 
 export function useAgentSync() {
   const { user } = useAuth();
-  const cloudSyncEnabled = useAgentStore((s) => s.cloudSyncEnabled);
   const addAgentToStore = useAgentStore((s) => s.addAgent);
   const updateAgentInStore = useAgentStore((s) => s.updateAgent);
   const deleteAgentFromStore = useAgentStore((s) => s.deleteAgent);
 
-  const shouldSync = user && cloudSyncEnabled;
+  // Always sync to cloud when user is logged in
+  const shouldSync = !!user;
 
   // Fetch agents from cloud
   const fetchAgents = useCallback(async (): Promise<Agent[]> => {
