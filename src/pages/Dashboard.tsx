@@ -14,6 +14,7 @@ import {
   Lock,
   Users,
   Heart,
+  Copy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -259,6 +260,40 @@ export default function Dashboard() {
     }
   };
 
+  const handleDuplicate = async (agent: DashboardAgent) => {
+    if (!user) {
+      toast.error('Sign in to duplicate agents');
+      return;
+    }
+
+    try {
+      const newAgent = {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        name: `${agent.name} (Copy)`,
+        template: agent.template,
+        prompt: agent.prompt,
+        temperature: agent.temperature,
+        max_tokens: agent.maxTokens,
+        is_public: false, // Duplicates start as private
+        creator_name: null,
+        description: null,
+        color: 'primary',
+        icon: 'bot',
+      };
+
+      const { error } = await supabase.from('agents').insert(newAgent);
+
+      if (error) throw error;
+
+      toast.success('Agent duplicated successfully');
+      fetchUserAgents();
+    } catch (err) {
+      console.error('Error duplicating agent:', err);
+      toast.error('Failed to duplicate agent');
+    }
+  };
+
   const onAgentEdited = async () => {
     await fetchPublicAgents();
     if (user) await fetchUserAgents();
@@ -353,12 +388,46 @@ export default function Dashboard() {
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleDuplicate(agent);
+                      }}
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setDeleteAgentState(agent);
                       }}
                       className="text-destructive focus:text-destructive"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {!isOwner && user && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDuplicate(agent);
+                      }}
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Duplicate to My Agents
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
