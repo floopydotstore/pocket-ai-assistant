@@ -100,7 +100,7 @@ export default function Dashboard() {
     return data || [];
   }, [user]);
 
-  // Fetch user's agents
+  // Fetch user's agents with likes counts
   const fetchUserAgents = useCallback(async () => {
     if (!user) {
       setUserAgents([]);
@@ -117,7 +117,26 @@ export default function Dashboard() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setUserAgents((data ?? []).map(row => mapRowToAgent(row, user.id, likes)));
+
+      // Fetch likes counts for user's agents
+      const agentIds = (data ?? []).map(a => a.id);
+      let likesCountMap: Record<string, number> = {};
+      
+      if (agentIds.length > 0) {
+        const { data: likesData } = await supabase
+          .from('agent_likes')
+          .select('agent_id')
+          .in('agent_id', agentIds);
+        
+        (likesData || []).forEach(like => {
+          likesCountMap[like.agent_id] = (likesCountMap[like.agent_id] || 0) + 1;
+        });
+      }
+
+      setUserAgents((data ?? []).map(row => ({
+        ...mapRowToAgent(row, user.id, likes),
+        likesCount: likesCountMap[row.id] || 0,
+      })));
     } catch (err) {
       console.error('Error fetching user agents', err);
     } finally {
@@ -444,6 +463,12 @@ export default function Dashboard() {
                   {formatLastRun(agent.lastRunAt)}
                 </span>
                 <span>{agent.runCount ?? 0} runs</span>
+                {agent.isPublic && (
+                  <span className="flex items-center gap-1">
+                    <Heart className="w-3.5 h-3.5" />
+                    {agent.likesCount || 0}
+                  </span>
+                )}
               </>
             )}
             {!isOwner && (
