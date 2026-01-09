@@ -13,8 +13,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const showNav = !noNavRoutes.includes(location.pathname);
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className={showNav ? 'pb-20' : ''}>
+    <div className="min-h-screen bg-background safe-area-top">
+      <main className={showNav ? 'pb-20 safe-area-bottom' : ''}>
         {children}
       </main>
       {showNav && <BottomNav />}
