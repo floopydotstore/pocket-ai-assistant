@@ -336,40 +336,25 @@ export default function Dashboard() {
         onClick={() => navigate(`/chat/${agent.id}`)}
       >
         <CardHeader className="pb-2">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-accent flex items-center justify-center text-xl">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-11 h-11 rounded-xl bg-accent flex items-center justify-center text-xl shrink-0">
                 {template?.icon || '🤖'}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-base">{agent.name}</CardTitle>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CardTitle className="text-base truncate">{agent.name}</CardTitle>
                   {agent.isPublic && (
-                    <Badge variant="secondary" className="text-xs gap-1 h-5">
+                    <Badge variant="secondary" className="text-xs gap-1 h-5 shrink-0">
                       <Globe className="w-3 h-3" />
                       Public
                     </Badge>
                   )}
                 </div>
-                <CardDescription className="text-xs">{template?.name || agent.template}</CardDescription>
+                <CardDescription className="text-xs truncate">{template?.name || agent.template}</CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              {!isOwner && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleLike(agent.id, agent.isLiked || false);
-                  }}
-                >
-                  <Heart
-                    className={`w-4 h-4 ${agent.isLiked ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`}
-                  />
-                </Button>
-              )}
+            <div className="flex items-center gap-1 shrink-0">
               <Button
                 variant="soft"
                 size="sm"
@@ -380,7 +365,7 @@ export default function Dashboard() {
                 className="h-8 gap-1.5"
               >
                 <Play className="w-3.5 h-3.5" />
-                Run
+                <span className="hidden sm:inline">Run</span>
               </Button>
               {isOwner && (
                 <DropdownMenu>
@@ -455,7 +440,7 @@ export default function Dashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
             {isOwner && (
               <>
                 <span className="flex items-center gap-1">
@@ -473,22 +458,22 @@ export default function Dashboard() {
             )}
             {!isOwner && (
               <>
-                {agent.creatorName && (
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
-                    by {agent.creatorName}
-                  </span>
-                )}
-                {!agent.creatorName && (
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
-                    Community agent
-                  </span>
-                )}
                 <span className="flex items-center gap-1">
-                  <Heart className="w-3.5 h-3.5" />
-                  {agent.likesCount || 0}
+                  <Users className="w-3.5 h-3.5" />
+                  {agent.creatorName ? `by ${agent.creatorName}` : 'Community agent'}
                 </span>
+                <button
+                  className="flex items-center gap-1 hover:text-destructive transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleLike(agent.id, agent.isLiked || false);
+                  }}
+                >
+                  <Heart
+                    className={`w-3.5 h-3.5 ${agent.isLiked ? 'fill-destructive text-destructive' : ''}`}
+                  />
+                  {agent.likesCount || 0}
+                </button>
               </>
             )}
           </div>
