@@ -10,7 +10,8 @@ const noNavRoutes = ['/', '/onboarding', '/create', '/auth'];
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
-  const showNav = !noNavRoutes.includes(location.pathname);
+  const isChatRoute = location.pathname.startsWith('/chat/');
+  const showNav = !noNavRoutes.includes(location.pathname) && !isChatRoute;
 
   return (
     <div className="min-h-screen bg-background safe-area-top">
