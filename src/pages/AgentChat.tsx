@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Send, Copy, FileText, CheckCircle, Trash2, MoreVertical } from 'lucide-react';
+import { ChevronLeft, Send, Copy, FileText, Trash2, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { useAgentStore } from '@/store/agentStore';
 import { TEMPLATES, type Message } from '@/types/agent';
 import { streamAgent } from '@/services/aiService';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -132,7 +132,7 @@ export default function AgentChat() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col safe-area-top">
+    <div className="h-screen bg-background flex flex-col safe-area-top overflow-hidden">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card/80 backdrop-blur-lg sticky top-0 z-10">
         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
@@ -247,17 +247,27 @@ function ChatMessage({
         isUser ? 'flex-row-reverse' : ''
       )}
     >
-      <div
-        className={cn(
-          'max-w-[85%] rounded-2xl px-4 py-3',
-          isUser
-            ? 'gradient-primary text-primary-foreground rounded-br-md'
-            : 'bg-muted rounded-bl-md'
-        )}
-      >
-        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-        {isStreaming && (
-          <span className="inline-block w-2 h-4 bg-current opacity-50 animate-pulse ml-1" />
+      <div className="flex flex-col gap-1 max-w-[85%]">
+        <div
+          className={cn(
+            'rounded-2xl px-4 py-3',
+            isUser
+              ? 'gradient-primary text-primary-foreground rounded-br-md'
+              : 'bg-muted rounded-bl-md'
+          )}
+        >
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          {isStreaming && (
+            <span className="inline-block w-2 h-4 bg-current opacity-50 animate-pulse ml-1" />
+          )}
+        </div>
+        {!isStreaming && (
+          <span className={cn(
+            'text-[10px] text-muted-foreground px-1',
+            isUser ? 'text-right' : 'text-left'
+          )}>
+            {format(new Date(message.timestamp), 'h:mm a')}
+          </span>
         )}
       </div>
       {!isUser && onCopy && !isStreaming && (
