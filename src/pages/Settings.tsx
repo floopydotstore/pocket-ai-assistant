@@ -217,20 +217,22 @@ export default function Settings() {
           </h2>
           <Card variant="default">
             <CardContent className="p-0 divide-y divide-border">
+              <a href="https://pocket-agent-eta.vercel.app/privacy.html" target="_blank" rel="noopener noreferrer">
               <SettingRow
                 icon={Shield}
                 title="Privacy Policy"
                 description="How we handle your data"
-                onClick={() => window.open('/privacy.html', '_blank')}
                 external
               />
+              </a>
+              <a href="https://pocket-agent-eta.vercel.app/terms.html" target="_blank" rel="noopener noreferrer">
               <SettingRow
                 icon={Shield}
                 title="Terms of Service"
                 description="Terms and conditions"
-                onClick={() => window.open('/terms.html', '_blank')}
                 external
               />
+              </a>
             </CardContent>
           </Card>
         </section>
