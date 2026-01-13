@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAgentStore } from "@/store/agentStore";
+import { useBackButton } from "@/hooks/useBackButton";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import CreateAgent from "./pages/CreateAgent";
@@ -39,6 +40,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const hasCompletedOnboarding = useAgentStore((s) => s.hasCompletedOnboarding);
+  
+  // Enable Android back button handling
+  useBackButton();
 
   return (
     <Routes>
