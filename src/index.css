@@ -167,11 +167,22 @@
     bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  /* Custom scrollbar */
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
-  }
+/* Custom scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+/* Overscroll behavior for Android */
+.overscroll-contain {
+  overscroll-behavior: contain;
+}
+
+/* Minimum touch target for accessibility (48dp = 48px at 1x density) */
+.touch-target-48 {
+  min-width: 48px;
+  min-height: 48px;
+}
 
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
