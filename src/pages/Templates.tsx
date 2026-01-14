@@ -46,8 +46,8 @@ export default function Templates() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [deleteTemplate, setDeleteTemplate] = useState<UserTemplate | null>(null);
-useEffect(() => {
-    window.scrollTo(0, document.body.scrollHeight);
+  useEffect(() => {
+    window.scrollTo(0, 0);
   }, []);
   // Keep tab synced to auth state
   useEffect(() => {
@@ -272,7 +272,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-background safe-area-top">
       {/* Header */}
-      <header className="px-5 pt-12 pb-4">
+      <header className="px-5 pt-4 pb-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">

@@ -84,15 +84,14 @@ export default function Auth() {
   return (
     <div className="min-h-screen bg-background safe-area-top flex flex-col">
       {/* Header */}
-      <header className="px-5 pt-6 pb-4">
+      <header className="px-4 pt-4 pb-4">
         <Button
-          variant="ghost"
-          size="sm"
+          variant="outline"
+          size="icon"
           onClick={() => navigate(-1)}
-          className="gap-2 -ml-2 text-muted-foreground"
+          className="h-12 w-12 rounded-xl border-border"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Back
+          <ArrowLeft className="w-6 h-6" />
         </Button>
       </header>
 

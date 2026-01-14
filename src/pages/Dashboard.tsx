@@ -71,8 +71,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'my-agents' | 'public-agents'>(() =>
     user ? 'my-agents' : 'public-agents'
   );
-   useEffect(() => {
-    window.scrollTo(0, document.body.scrollHeight);
+  useEffect(() => {
+    window.scrollTo(0, 0);
   }, []);
 
   // Keep tab synced to auth state
@@ -512,7 +512,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background safe-area-top">
       {/* Header */}
-      <header className="px-5 pt-12 pb-4">
+      <header className="px-5 pt-4 pb-4">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Pocket Agent</h1>

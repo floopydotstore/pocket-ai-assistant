@@ -33,7 +33,7 @@ export default function AgentChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    window.scrollTo(0, document.body.scrollHeight);
+    window.scrollTo(0, 0);
     inputRef.current?.focus();
   }, []);
 
@@ -138,9 +138,14 @@ export default function AgentChat() {
   return (
     <div className="h-screen bg-background flex flex-col safe-area-top overflow-hidden">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-10 border-b border-border bg-card/80 backdrop-blur-lg sticky top-0 z-10">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-          <ChevronLeft className="w-5 h-5" />
+      <header className="flex items-center gap-3 px-4 py-4 border-b border-border bg-card/80 backdrop-blur-lg sticky top-0 z-10">
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={() => navigate('/dashboard')}
+          className="h-12 w-12 rounded-xl border-border"
+        >
+          <ChevronLeft className="w-6 h-6" />
         </Button>
         <div className="flex items-center gap-3 flex-1">
           <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-lg">
@@ -167,7 +172,7 @@ export default function AgentChat() {
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 scrollbar-thin">
         {messages.length === 0 && !streamingContent ? (
           <EmptyChat template={template} onSuggestionClick={setInput} />
         ) : (

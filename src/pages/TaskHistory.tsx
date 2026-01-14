@@ -25,8 +25,8 @@ export default function TaskHistory() {
   const deleteHistoryEntry = useAgentStore((s) => s.deleteHistoryEntry);
   const clearHistory = useAgentStore((s) => s.clearHistory);
   const agents = useAgentStore((s) => s.agents);
-useEffect(() => {
-    window.scrollTo(0, document.body.scrollHeight);
+  useEffect(() => {
+    window.scrollTo(0, 0);
   }, []);
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -68,7 +68,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-background safe-area-top">
       {/* Header */}
-      <header className="px-5 pt-12 pb-4">
+      <header className="px-5 pt-4 pb-4">
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-2xl font-bold text-foreground">History</h1>
