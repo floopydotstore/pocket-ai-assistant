@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Settings as SettingsIcon,
@@ -40,7 +40,9 @@ export default function Settings() {
   const exportData = useAgentStore((s) => s.exportData);
   const clearUserData = useAgentStore((s) => s.clearUserData);
   const clearAllData = useAgentStore((s) => s.clearAllData);
-
+useEffect(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+  }, []);
   const handleExport = () => {
     const data = exportData();
     const blob = new Blob([data], { type: 'application/json' });
@@ -84,7 +86,7 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-background safe-area-top">
       {/* Header */}
-      <header className="px-5 pt-6 pb-4">
+      <header className="px-5 pt-12 pb-4">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
             <SettingsIcon className="w-5 h-5 text-muted-foreground" />

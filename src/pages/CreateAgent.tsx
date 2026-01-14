@@ -43,6 +43,9 @@ export default function CreateAgent() {
   const [temperature, setTemperature] = useState([0.7]);
   const [maxTokens, setMaxTokens] = useState([500]);
   const [isPublic, setIsPublic] = useState(false);
+   useEffect(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+  }, []);
 
   // Fetch user templates
   useEffect(() => {
@@ -182,7 +185,7 @@ export default function CreateAgent() {
   return (
     <div className="min-h-screen bg-background safe-area-top safe-area-bottom">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-4 border-b border-border">
+      <header className="flex items-center gap-3 px-4 py-12 border-b border-border">
         <Button variant="ghost" size="icon" onClick={handleBack}>
           <ChevronLeft className="w-5 h-5" />
         </Button>
@@ -248,7 +251,7 @@ export default function CreateAgent() {
       </main>
 
       {/* Bottom action */}
-      <div className="fixed bottom-0 left-0 right-0 px-5 py-4 bg-background border-t border-border safe-area-bottom">
+      <div className="fixed bottom-3 left-0 right-0 px-5 pb-8 pt-8 bg-background border-t border-border">
         <Button
           variant="hero"
           size="lg"

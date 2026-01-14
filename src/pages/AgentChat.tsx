@@ -32,6 +32,10 @@ export default function AgentChat() {
   const [streamingContent, setStreamingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+    inputRef.current?.focus();
+  }, []);
 
   const messages = conversation?.messages || [];
   const template = TEMPLATES.find((t) => t.id === agent?.template);
@@ -134,7 +138,7 @@ export default function AgentChat() {
   return (
     <div className="h-screen bg-background flex flex-col safe-area-top overflow-hidden">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card/80 backdrop-blur-lg sticky top-0 z-10">
+      <header className="flex items-center gap-3 px-4 py-10 border-b border-border bg-card/80 backdrop-blur-lg sticky top-0 z-10">
         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
           <ChevronLeft className="w-5 h-5" />
         </Button>
@@ -195,7 +199,7 @@ export default function AgentChat() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-border bg-card p-4 safe-area-bottom">
+      <div className="border-t border-border bg-card p-4 pb-10">
         <div className="max-w-2xl mx-auto flex gap-2 items-end">
           <div className="flex-1 relative">
             <textarea

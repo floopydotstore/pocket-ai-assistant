@@ -16,6 +16,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 
 export default function TaskHistory() {
   const navigate = useNavigate();
@@ -24,7 +25,9 @@ export default function TaskHistory() {
   const deleteHistoryEntry = useAgentStore((s) => s.deleteHistoryEntry);
   const clearHistory = useAgentStore((s) => s.clearHistory);
   const agents = useAgentStore((s) => s.agents);
-
+useEffect(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+  }, []);
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -65,7 +68,7 @@ export default function TaskHistory() {
   return (
     <div className="min-h-screen bg-background safe-area-top">
       {/* Header */}
-      <header className="px-5 pt-6 pb-4">
+      <header className="px-5 pt-12 pb-4">
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-2xl font-bold text-foreground">History</h1>
