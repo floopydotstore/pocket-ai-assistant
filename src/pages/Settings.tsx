@@ -219,7 +219,7 @@ export default function Settings() {
           </h2>
           <Card variant="default">
             <CardContent className="p-0 divide-y divide-border">
-              <a href="https://pocket-agent-eta.vercel.app/privacy.html" target="_blank" rel="noopener noreferrer">
+              <a href="https://floopy.store/privacy.html" target="_blank" rel="noopener noreferrer">
               <SettingRow
                 icon={Shield}
                 title="Privacy Policy"
@@ -227,7 +227,7 @@ export default function Settings() {
                 external
               />
               </a>
-              <a href="https://pocket-agent-eta.vercel.app/terms.html" target="_blank" rel="noopener noreferrer">
+              <a href="https://floopy.store/terms.html" target="_blank" rel="noopener noreferrer">
               <SettingRow
                 icon={Shield}
                 title="Terms of Service"

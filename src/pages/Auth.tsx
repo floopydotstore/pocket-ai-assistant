@@ -229,11 +229,11 @@ export default function Auth() {
           {/* Privacy note */}
           <p className="text-xs text-center text-muted-foreground">
             By continuing, you agree to our{' '}
-            <a href="/terms.html" target="_blank" className="text-primary hover:underline">
+            <a href="https://floopy.store/terms.html" target="_blank" className="text-primary hover:underline">
               Terms
             </a>{' '}
             and{' '}
-            <a href="/privacy.html" target="_blank" className="text-primary hover:underline">
+            <a href="https://floopy.store/privacy.html" target="_blank" className="text-primary hover:underline">
               Privacy Policy
             </a>
           </p>

@@ -111,11 +111,11 @@ export default function Onboarding() {
           <Card variant="ghost" className="p-4 bg-muted/50 animate-slide-up">
             <p className="text-xs text-muted-foreground text-center">
               By continuing, you agree to our{' '}
-              <a href="/terms.html" className="text-primary hover:underline">
+              <a href="https://floopy.store/terms.html" className="text-primary hover:underline">
                 Terms of Service
               </a>{' '}
               and{' '}
-              <a href="/privacy.html" className="text-primary hover:underline">
+              <a href="https://floopy.store/privacy.html" className="text-primary hover:underline">
                 Privacy Policy
               </a>
             </p>
