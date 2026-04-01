@@ -16,9 +16,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Fixed safe area background for status bar */}
-      <div className="fixed top-0 left-0 right-0 bg-background z-50" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 28px)' }} />
+      <div className="fixed top-0 left-0 right-0 bg-background z-50" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 12px)' }} />
       
-      <main className={`flex-1 pt-6 safe-area-top ${showNav ? 'pb-20 safe-area-bottom' : ''}`}>
+      <main className={`flex-1 pt-4 safe-area-top ${showNav ? 'pb-20 safe-area-bottom' : ''}`}>
         {children}
       </main>
       {showNav && <BottomNav />}
