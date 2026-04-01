@@ -249,7 +249,7 @@ export default function Settings() {
               <SettingRow
                 icon={Info}
                 title="Version"
-                description="1.0.1"
+                description="1.0.2"
               />
               <SettingRow
                 icon={Mail}
