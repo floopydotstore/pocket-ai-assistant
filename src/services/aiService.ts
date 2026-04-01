@@ -23,6 +23,15 @@ type Message = { role: 'user' | 'assistant'; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`;
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+  };
+}
+
 export async function runAgent(request: AIRequest): Promise<AIResponse> {
   const { userInput, template, agentName, prompt, temperature = 0.7, maxTokens = 500 } = request;
 
@@ -31,12 +40,11 @@ export async function runAgent(request: AIRequest): Promise<AIResponse> {
       { role: 'user', content: `${prompt}\n\nUser input: ${userInput}` }
     ];
 
+    const headers = await getAuthHeaders();
+
     const response = await fetch(CHAT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-      },
+      headers,
       body: JSON.stringify({ 
         messages, 
         template, 
@@ -115,12 +123,11 @@ export async function streamAgent(
       { role: 'user', content: `${prompt}\n\nUser input: ${userInput}` }
     ];
 
+    const headers = await getAuthHeaders();
+
     const response = await fetch(CHAT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-      },
+      headers,
       body: JSON.stringify({ 
         messages, 
         template, 
